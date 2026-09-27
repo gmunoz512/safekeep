@@ -30,7 +30,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     static let albumName = "Sound Photos"
     static let testAlbumName = "Sound Photo Tests"
 
-    static let knownAudioTypes = [
+    nonisolated static let knownAudioTypes = [
         "public.audio", "public.mpeg-4-audio", "com.apple.m4a-audio", "com.apple.coreaudio-format",
         "public.mp3", "org.xiph.opus", "org.xiph.ogg-audio", "com.microsoft.waveform-audio",
         "public.aiff-audio", "public.aifc-audio", "public.amr-audio", "org.xiph.flac",
@@ -39,11 +39,11 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     func say(_ s: String) { log += s + "\n"; print(s) }
 
-    private static func tmp(_ ext: String) -> URL {
+    nonisolated private static func tmp(_ ext: String) -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("audio-\(UUID().uuidString).\(ext)")
     }
 
-    private static func isAudioType(_ id: String) -> Bool {
+    nonisolated private static func isAudioType(_ id: String) -> Bool {
         if knownAudioTypes.contains(id) { return true }
         return UTType(id)?.conforms(to: .audio) ?? false
     }
