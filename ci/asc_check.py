@@ -2,7 +2,7 @@
 """ASC API helper: ensure bundle ID exists, check app record, list builds/users.
 Reads the .p8 contents from env ASC_API_KEY_P8 (never printed)."""
 import os, sys, time, json, urllib.request, urllib.error, jwt
-KEY_ID, ISSUER = "GL4T8QSDND", "b816f285-1d7a-4f76-b6a9-c7cfa01d579a"
+KEY_ID, ISSUER = os.environ.get("ASC_KEY_ID","2JLG54NH47"), "b816f285-1d7a-4f76-b6a9-c7cfa01d579a"
 BUNDLE = "com.gmunoz.soundphototest"
 p8 = os.environ.get("ASC_API_KEY_P8")
 if not p8: sys.exit("ASC_API_KEY_P8 not set")
