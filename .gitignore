@@ -5,3 +5,4 @@ xcuserdata/
 *.p8
 private_keys/
 .DS_Store
+__pycache__/
