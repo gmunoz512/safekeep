@@ -12,9 +12,16 @@ concurrency:
 jobs:
   # Compile check with no signing and no secrets: proves the project builds against the iOS SDK.
   compile-check:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode 26+ (App Store requires iOS 26 SDK)
+        run: |
+          ls -d /Applications/Xcode*.app
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
+          [ -n "$X" ] && sudo xcode-select -s "$X"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
       - name: Xcode info
         run: |
           xcodebuild -version
@@ -40,7 +47,7 @@ jobs:
 
   testflight:
     needs: compile-check
-    runs-on: macos-15
+    runs-on: macos-26
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -49,6 +56,13 @@ jobs:
       BUILD_NUMBER: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@v4
+      - name: Select Xcode 26+ (App Store requires iOS 26 SDK)
+        run: |
+          ls -d /Applications/Xcode*.app
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | grep -vi beta | sort -V | tail -1)
+          [ -n "$X" ] && sudo xcode-select -s "$X"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphoneos
 
       - name: Check secrets
         run: |
