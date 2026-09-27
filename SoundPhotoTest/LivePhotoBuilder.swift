@@ -77,9 +77,9 @@ enum LivePhotoBuilder {
 
     // MARK: Movie
 
-    private static func writeMovie(image: CGImage, audio: AVURLAsset, duration: CMTime,
-                                   to url: URL, identifier: String,
-                                   includeStillImageTime: Bool) async throws {
+    static func writeMovie(image: CGImage, audio: AVURLAsset, duration: CMTime,
+                           to url: URL, identifier: String,
+                           includeStillImageTime: Bool, creationDate: Date = Date()) async throws {
         try? FileManager.default.removeItem(at: url)
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
 
@@ -92,14 +92,16 @@ enum LivePhotoBuilder {
         let dateItem = AVMutableMetadataItem()
         dateItem.keySpace = .quickTimeMetadata
         dateItem.key = "com.apple.quicktime.creationdate" as NSString
-        dateItem.value = ISO8601DateFormatter.string(from: Date(), timeZone: .current,
+        dateItem.value = ISO8601DateFormatter.string(from: creationDate, timeZone: .current,
                                                      formatOptions: [.withInternetDateTime]) as NSString
         dateItem.dataType = kCMMetadataBaseDataType_UTF8 as String
         writer.metadata = [idItem, dateItem]
 
         // Video: same frame for the whole duration
-        let width = 1920
-        let height = Int((Double(width) * Double(image.height) / Double(image.width) / 2).rounded()) * 2
+        // Longest side 1920, even dimensions, same aspect as the (already upright) frame.
+        let scale = 1920.0 / Double(max(image.width, image.height))
+        let width = max(2, Int((Double(image.width) * scale / 2).rounded()) * 2)
+        let height = max(2, Int((Double(image.height) * scale / 2).rounded()) * 2)
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: width,
@@ -219,6 +221,80 @@ enum LivePhotoBuilder {
         ctx.interpolationQuality = .high
         ctx.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
         return pb
+    }
+
+    // MARK: Real photo + any audio
+
+    /// Builds a Live Photo pair from a user's ORIGINAL image data (metadata preserved, MakerApple 17 replaced)
+    /// and an AAC audio file (full length). Returns the pair and human-readable notes.
+    static func buildFromOriginal(imageData: Data, audioURL: URL, identifier: String,
+                                  creationDate: Date) async throws -> (LivePhotoPair, [String]) {
+        var notes: [String] = []
+        guard let src = CGImageSourceCreateWithData(imageData as CFData, nil),
+              CGImageSourceGetCount(src) > 0 else { throw TestError("Could not read the photo data.") }
+        let srcType = (CGImageSourceGetType(src) as String?) ?? "?"
+        let heic = srcType == UTType.heic.identifier || srcType == UTType.heif.identifier || srcType == "public.heic"
+        notes.append("source image type: \(srcType) → writing \(heic ? "HEIC" : "JPEG")")
+
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("soundphoto-\(identifier)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let stillURL = dir.appendingPathComponent(heic ? "SoundPhoto.HEIC" : "SoundPhoto.JPG")
+        let movieURL = dir.appendingPathComponent("SoundPhoto.MOV")
+
+        var props = (CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [String: Any]) ?? [:]
+        let exif = props[kCGImagePropertyExifDictionary as String] as? [String: Any]
+        notes.append("source pixels: \(props[kCGImagePropertyPixelWidth as String] ?? "?")x\(props[kCGImagePropertyPixelHeight as String] ?? "?") orientation=\(props[kCGImagePropertyOrientation as String] ?? "none")")
+        notes.append("source DateTimeOriginal: \(exif?[kCGImagePropertyExifDateTimeOriginal as String] ?? "none")  GPS: \(props[kCGImagePropertyGPSDictionary as String] != nil ? "yes" : "no")")
+        var maker = (props[kCGImagePropertyMakerAppleDictionary as String] as? [String: Any]) ?? [:]
+        notes.append("source MakerApple keys: \(maker.count), old [17]=\(maker["17"] ?? "none")")
+        maker["17"] = identifier
+        props[kCGImagePropertyMakerAppleDictionary as String] = maker
+        props[kCGImageDestinationLossyCompressionQuality as String] = 0.95
+
+        func writeOut(_ p: [String: Any]) -> Bool {
+            let outType = (heic ? UTType.heic : UTType.jpeg).identifier as CFString
+            guard let out = CGImageDestinationCreateWithURL(stillURL as CFURL, outType, 1, nil) else { return false }
+            CGImageDestinationAddImageFromSource(out, src, 0, p as CFDictionary)
+            return CGImageDestinationFinalize(out)
+        }
+        func written17() -> String? {
+            guard let s2 = CGImageSourceCreateWithURL(stillURL as CFURL, nil),
+                  let p2 = CGImageSourceCopyPropertiesAtIndex(s2, 0, nil) as? [String: Any],
+                  let m2 = p2[kCGImagePropertyMakerAppleDictionary as String] as? [String: Any] else { return nil }
+            return m2["17"] as? String
+        }
+        guard writeOut(props) else { throw TestError("Could not write still image.") }
+        if written17() != identifier {
+            notes.append("MakerApple merge did not stick; rewriting with only key 17")
+            props[kCGImagePropertyMakerAppleDictionary as String] = ["17": identifier]
+            guard writeOut(props) else { throw TestError("Could not write still image (retry).") }
+        }
+        notes.append("written still MakerApple[17] \(written17() == identifier ? "OK (match)" : "MISSING/MISMATCH")")
+        if let s3 = CGImageSourceCreateWithURL(stillURL as CFURL, nil),
+           let p3 = CGImageSourceCopyPropertiesAtIndex(s3, 0, nil) as? [String: Any] {
+            let e3 = p3[kCGImagePropertyExifDictionary as String] as? [String: Any]
+            notes.append("written still DateTimeOriginal: \(e3?[kCGImagePropertyExifDateTimeOriginal as String] ?? "none")  GPS: \(p3[kCGImagePropertyGPSDictionary as String] != nil ? "yes" : "no")")
+        }
+
+        // Upright frame for the movie
+        let thumbOpts: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 1920,
+        ]
+        guard let frame = CGImageSourceCreateThumbnailAtIndex(src, 0, thumbOpts as CFDictionary) else {
+            throw TestError("Could not render movie frame.")
+        }
+        notes.append("movie frame: \(frame.width)x\(frame.height) (upright)")
+
+        let audio = AVURLAsset(url: audioURL)
+        let duration = try await audio.load(.duration)
+        try await writeMovie(image: frame, audio: audio, duration: duration, to: movieURL,
+                             identifier: identifier, includeStillImageTime: true, creationDate: creationDate)
+        let pair = LivePhotoPair(stillURL: stillURL, movieURL: movieURL, duration: duration.seconds, identifier: identifier)
+        notes.append(contentsOf: try await verify(pair))
+        return (pair, notes)
     }
 
     // MARK: Pre-save self check
