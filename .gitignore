@@ -1,0 +1,7 @@
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.p8
+private_keys/
+.DS_Store
