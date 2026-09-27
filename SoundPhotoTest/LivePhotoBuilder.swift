@@ -53,6 +53,19 @@ enum LivePhotoBuilder {
         }
         var props = (CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [String: Any]) ?? [:]
         props[kCGImagePropertyMakerAppleDictionary as String] = ["17": identifier]
+        // Stamp "now" so Photos sorts the asset as just taken (the bundled JPEG has no EXIF date).
+        let exifDate = DateFormatter()
+        exifDate.locale = Locale(identifier: "en_US_POSIX")
+        exifDate.dateFormat = "yyyy:MM:dd HH:mm:ss"
+        let tz = DateFormatter()
+        tz.locale = Locale(identifier: "en_US_POSIX")
+        tz.dateFormat = "xxx"
+        let now = Date()
+        var exif = (props[kCGImagePropertyExifDictionary as String] as? [String: Any]) ?? [:]
+        exif[kCGImagePropertyExifDateTimeOriginal as String] = exifDate.string(from: now)
+        exif[kCGImagePropertyExifDateTimeDigitized as String] = exifDate.string(from: now)
+        exif[kCGImagePropertyExifOffsetTimeOriginal as String] = tz.string(from: now)
+        props[kCGImagePropertyExifDictionary as String] = exif
         props[kCGImageDestinationLossyCompressionQuality as String] = 0.95
         guard let out = CGImageDestinationCreateWithURL(dest as CFURL, (heic ? UTType.heic : UTType.jpeg).identifier as CFString, 1, nil) else {
             throw TestError("Could not create JPEG destination.")
@@ -76,7 +89,13 @@ enum LivePhotoBuilder {
         idItem.key = "com.apple.quicktime.content.identifier" as NSString
         idItem.value = identifier as NSString
         idItem.dataType = kCMMetadataBaseDataType_UTF8 as String
-        writer.metadata = [idItem]
+        let dateItem = AVMutableMetadataItem()
+        dateItem.keySpace = .quickTimeMetadata
+        dateItem.key = "com.apple.quicktime.creationdate" as NSString
+        dateItem.value = ISO8601DateFormatter.string(from: Date(), timeZone: .current,
+                                                     formatOptions: [.withInternetDateTime]) as NSString
+        dateItem.dataType = kCMMetadataBaseDataType_UTF8 as String
+        writer.metadata = [idItem, dateItem]
 
         // Video: same frame for the whole duration
         let width = 1920
