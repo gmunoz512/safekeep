@@ -12,7 +12,7 @@ struct QuickPasteView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var autoPasteDone = false
     @State private var pasting = false
-    @State private var returning = false
+    @State private var photosOpenFailed = false
     @State private var showLog = false
     @State private var presenter = PresenterHolder()
 
@@ -21,10 +21,11 @@ struct QuickPasteView: View {
             Theme.background
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    header
                     if let r = m.result {
-                        savedCard(r)
+                        savedCard(r)   // arrow hint first, right under the "◀ Messages" breadcrumb
+                        header
                     } else {
+                        header
                         statusCard
                         if let sel = m.selectedForSave, m.audioURL == nil { queuedRow(sel) }
                         photos
@@ -55,10 +56,9 @@ struct QuickPasteView: View {
             scheduleAutoPaste(reason: "scenePhase")
         }
         .onChange(of: m.result) { r in
-            guard r != nil, !returning else { return }
-            returning = true
-            m.say("saved → returning to Messages in 1.5 s")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { backToMessages() }
+            // No auto-open of Messages (sms:/messages:// can land on a blank or new message).
+            // The system "◀ Messages" breadcrumb returns to the exact conversation.
+            if r != nil { m.say("saved → showing Saved card (back via ◀ Messages breadcrumb)") }
         }
     }
 
@@ -173,26 +173,47 @@ struct QuickPasteView: View {
     }
 
     private func savedCard(_ r: SavedAsset) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Label("Saved with the voice note", systemImage: "checkmark.circle.fill")
-                .font(Theme.rounded(.title3, .semibold)).foregroundStyle(Theme.peach)
-            Text("Returning to Messages… (or tap \"◀ Messages\" at the top left)")
-                .font(Theme.rounded(.subheadline)).foregroundStyle(Theme.cream)
-            Button("Back to Messages") { backToMessages() }.buttonStyle(PeachButtonStyle())
-            Button("Add another") { m.result = nil; returning = false; m.clearSound() }.buttonStyle(SoftButtonStyle())
+        VStack(alignment: .leading, spacing: 16) {
+            backHint
+            LivePhotoResultCard(item: r, log: { m.say($0) }) { m.result = nil; m.clearSound() }
+            Button { openPhotosApp() } label: {
+                Label("See it in Photos", systemImage: "photo.on.rectangle")
+            }
+            .buttonStyle(PeachButtonStyle())
+            if photosOpenFailed {
+                Text("iOS wouldn't open Photos from here. Open the Photos app → Albums → \"Safekeep\".")
+                    .font(Theme.rounded(.caption)).foregroundStyle(Theme.peach)
+            } else {
+                Text("It's in the \"Safekeep\" album, next to the original.")
+                    .font(Theme.rounded(.caption)).foregroundStyle(Theme.sage)
+            }
+            Button("Add another") { m.result = nil; m.clearSound() }.buttonStyle(SoftButtonStyle())
         }
-        .themeCard()
     }
 
-    private func backToMessages() {
-        let urls = ["messages://", "sms:"].compactMap(URL.init(string:))
-        func tryOpen(_ i: Int) {
-            guard i < urls.count else { m.say("couldn't open Messages; use ◀ Messages"); return }
-            UIApplication.shared.open(urls[i]) { ok in
-                m.say("open \(urls[i]) → \(ok)")
-                if !ok { tryOpen(i + 1) }
+    /// Points at the system "◀ Messages" breadcrumb (status bar, top left), which returns to the exact chat.
+    private var backHint: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "arrow.up.left")
+                .font(.system(size: 34, weight: .heavy))
+                .foregroundStyle(Theme.peach)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Saved ✓").font(Theme.rounded(.largeTitle, .bold)).foregroundStyle(Theme.cream)
+                Text("Tap ◀ Messages at the top left to go back to your chat")
+                    .font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.peach)
+                    .fixedSize(horizontal: false, vertical: true)
             }
+            Spacer(minLength: 0)
         }
-        tryOpen(0)
+        .padding(.top, 2)
+    }
+
+    private func openPhotosApp() {
+        // photos-redirect:// is Photos' own URL scheme: widely used but not documented by Apple.
+        guard let url = URL(string: "photos-redirect://") else { photosOpenFailed = true; return }
+        UIApplication.shared.open(url) { ok in
+            m.say("open photos-redirect:// → \(ok)")
+            if !ok { photosOpenFailed = true }
+        }
     }
 }
