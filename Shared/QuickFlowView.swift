@@ -89,7 +89,25 @@ struct QuickFlowView: View {
     }
 
     /// Always-visible status: live clipboard types, paste button state, and the result of the last tap.
-    private var statusLines: some View {
+    @ViewBuilder private var statusLines: some View {
+        #if DEBUG
+        debugStatusLines
+        #else
+        VStack(alignment: .leading, spacing: 4) {
+            if !m.pasteStatus.isEmpty {
+                Text(m.pasteStatus).foregroundStyle(m.pasteStatusIsError ? Theme.warning : Theme.cream)
+            }
+            if m.clipboardUnreadable && m.audioURL == nil && showPasteControls {
+                Text("iOS doesn't let Safekeep read the clipboard here. Use \"Choose audio file\"\(openApp != nil ? ", or \"Open Safekeep\" to paste there" : "").")
+                    .foregroundStyle(Theme.warning)
+            }
+        }
+        .font(Theme.rounded(.footnote))
+        .fixedSize(horizontal: false, vertical: true)
+        #endif
+    }
+
+    private var debugStatusLines: some View {
         VStack(alignment: .leading, spacing: 3) {
             if showPasteControls { Text(m.clipStatus) }
             if let e = m.pasteButtonEnabled, m.audioURL == nil, showPasteControls {

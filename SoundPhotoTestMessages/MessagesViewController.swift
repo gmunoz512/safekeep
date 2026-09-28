@@ -154,7 +154,9 @@ struct ExtensionRootView: View {
                     }
                     addCard
                     QuickFlowView(m: m, recents: recents, columns: 4, onNeedRoom: requestExpand, showPasteControls: false)
+                    #if DEBUG
                     if showLog { logSection }
+                    #endif
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 10)
@@ -177,11 +179,13 @@ struct ExtensionRootView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             Text("Safekeep").font(Theme.rounded(.title3, .bold)).foregroundStyle(Theme.cream)
             Spacer()
+            #if DEBUG
             Button(showLog ? "Hide log" : "Log") {
                 showLog.toggle()
                 if showLog { requestExpand() }
             }
             .buttonStyle(SoftButtonStyle())
+            #endif
         }
     }
 

@@ -118,7 +118,11 @@ struct ShareRootView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             Text("Safekeep").font(Theme.rounded(.headline, .bold)).foregroundStyle(Theme.cream)
             Spacer()
+            #if DEBUG
             Button(showLog ? "Hide log" : "Log") { showLog.toggle() }.buttonStyle(SoftButtonStyle())
+            #else
+            Button("Cancel") {}.buttonStyle(SoftButtonStyle()).hidden().accessibilityHidden(true) // keeps the title centered
+            #endif
         }
     }
 }

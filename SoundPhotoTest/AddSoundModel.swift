@@ -190,9 +190,26 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     func setPasteStatus(_ text: String, error: Bool = false) {
+        #if DEBUG
         pasteStatus = text
+        #else
+        pasteStatus = Self.userFacing(text)
+        #endif
         pasteStatusIsError = error
         say("[status] " + text)
+    }
+
+    /// Release builds: drop clipboard/type diagnostics and "see log" hints from status text.
+    static func userFacing(_ text: String) -> String {
+        let progress = ["Reading clipboard", "Paste button tapped", "Paste button gave", "Got audio via", "Loading "]
+        if progress.contains(where: { text.hasPrefix($0) }) { return "Loading the voice note…" }
+        var t = text.replacingOccurrences(of: " — see log", with: "")
+        t = t.replacingOccurrences(of: "item(s)", with: "items")
+        t = t.replacingOccurrences(of: "Paste button: items had", with: "The copied item had")
+        t = t.replacingOccurrences(of: #"\s*\([^)]*(#|item|types|public\.|com\.|dyn\.|\.m4a|\.caf|Don't Allow)[^)]*\)"#,
+                                   with: "", options: .regularExpression)
+        t = t.replacingOccurrences(of: #"\s*It has: [^.]*\."#, with: ".", options: .regularExpression)
+        return t
     }
 
     /// Items handed over by the UIPasteControl (no system prompt).
@@ -596,6 +613,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     func toggleRecord() async {
+        #if DEBUG
         let session = AVAudioSession.sharedInstance()
         if isRecording, let recorder {
             recorder.stop()
@@ -629,6 +647,9 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         } catch {
             say("Recorder error: \(error.localizedDescription)")
         }
+        #else
+        say("Recording is only available in debug builds.")
+        #endif
     }
 
     /// Inspect, convert to AAC if needed, and make it the current sound.

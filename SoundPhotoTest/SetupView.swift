@@ -16,7 +16,9 @@ struct SetupView: View {
                 Theme.background
                 ScrollView {
                     VStack(spacing: 20) {
+                        #if DEBUG
                         gearRow
+                        #endif
                         HeroCard(title: "Paste voice note",
                                  subtitle: clipAudioTypes.isEmpty
                                     ? "Copy a voice note in Messages, then tap here"
@@ -34,7 +36,9 @@ struct SetupView: View {
                 .scrollIndicators(.hidden)
             }
             .toolbar(.hidden, for: .navigationBar)
+            #if DEBUG
             .navigationDestination(isPresented: $showDebug) { AddSoundView() }
+            #endif
             .onChange(of: scenePhase) { p in
                 if p == .active { status = PHPhotoLibrary.authorizationStatus(for: .readWrite); refreshClipboard() }
             }

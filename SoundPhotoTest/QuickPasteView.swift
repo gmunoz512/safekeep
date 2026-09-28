@@ -120,7 +120,9 @@ struct QuickPasteView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             Text("Safekeep").font(Theme.rounded(.title3, .bold)).foregroundStyle(Theme.cream)
             Spacer()
+            #if DEBUG
             Button(showLog ? "Hide log" : "Log") { showLog.toggle() }.buttonStyle(SoftButtonStyle())
+            #endif
             Button("Close") { onClose() }.buttonStyle(SoftButtonStyle())
         }
     }

@@ -497,7 +497,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gmunoz.soundphototest;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -518,7 +518,6 @@
 				INFOPLIST_FILE = SoundPhotoTest/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -528,7 +527,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
+				EXCLUDED_SOURCE_FILE_NAMES = "test-photo.jpg test-voice.m4a";
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gmunoz.soundphototest;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -557,7 +557,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gmunoz.soundphototest.messages;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -579,7 +579,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SoundPhotoTestMessages/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -587,7 +586,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gmunoz.soundphototest.messages;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -616,7 +615,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gmunoz.soundphototest.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -637,7 +636,6 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SoundPhotoTestShare/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -645,7 +643,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.gmunoz.soundphototest.share;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
