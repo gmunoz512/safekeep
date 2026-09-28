@@ -36,6 +36,7 @@
 		B10000000000000000000028 /* AddSoundModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* AddSoundModel.swift */; };
 		B10000000000000000000029 /* LivePhotoBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* LivePhotoBuilder.swift */; };
 		B1000000000000000000002A /* SoundPhotoTestMessages.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000C /* SoundPhotoTestMessages.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B1000000000000000000F001 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000F001 /* MainInterface.storyboard */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -88,6 +89,7 @@
 		B2000000000000000000000A /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B2000000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B2000000000000000000000C /* SoundPhotoTestMessages.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SoundPhotoTestMessages.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B2000000000000000000F001 /* MainInterface.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = MainInterface.storyboard; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -173,6 +175,7 @@
 			isa = PBXGroup;
 			children = (
 				B20000000000000000000009 /* MessagesViewController.swift */,
+				B2000000000000000000F001 /* MainInterface.storyboard */,
 				B2000000000000000000000A /* Assets.xcassets */,
 				B2000000000000000000000B /* Info.plist */,
 			);
@@ -271,6 +274,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B10000000000000000000027 /* Assets.xcassets in Resources */,
+				B1000000000000000000F001 /* MainInterface.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
