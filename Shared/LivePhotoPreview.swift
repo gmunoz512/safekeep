@@ -56,27 +56,26 @@ struct LivePhotoResultCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label("Saved to Photos", systemImage: "checkmark.circle.fill").font(.headline).foregroundStyle(.green)
+                Label("Saved to Photos", systemImage: "checkmark.circle.fill").font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.peach)
                 Spacer()
-                Button("Done", action: onDone).buttonStyle(.bordered)
+                Button("Done", action: onDone).buttonStyle(SoftButtonStyle())
             }
             ZStack {
-                Color.black.opacity(0.05)
+                Color.black.opacity(0.15)
                 if let livePhoto {
                     LivePhotoViewRep(livePhoto: livePhoto, lastPlayed: $lastPlayed, playing: $playing)
                 } else {
-                    Text(status).font(.footnote).padding()
+                    Text(status).font(Theme.rounded(.footnote)).foregroundStyle(Theme.sage).padding()
                 }
             }
             .frame(maxWidth: .infinity)
             .frame(height: 260)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            Text(playing ? "Playing…" : "Press and hold the photo to hear it.").font(.subheadline)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            Text(playing ? "Playing…" : "Press and hold the photo to hear it.").font(Theme.rounded(.subheadline)).foregroundStyle(Theme.cream)
             Text("Live Photo: \(isLive ? "yes" : "checking…") · last play: \(lastPlayed) · album \"Safekeep\"")
-                .font(.caption2).foregroundStyle(.secondary)
+                .font(Theme.rounded(.caption2)).foregroundStyle(Theme.sage)
         }
-        .padding()
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.green.opacity(0.08)))
+        .themeCard()
         .task(id: item.localIdentifier) { await load() }
     }
 

@@ -194,7 +194,7 @@ struct PhotoThumb: View {
     @State private var image: UIImage?
 
     var body: some View {
-        Color(uiColor: .secondarySystemBackground)
+        Theme.card
             .aspectRatio(1, contentMode: .fit)
             .overlay {
                 if let image {
@@ -230,35 +230,35 @@ struct RecentPhotosGrid: View {
             switch recents.status {
             case .denied, .restricted:
                 Text("No Photos access. Open Settings > Privacy & Security > Photos > Safekeep and choose Full Access (or open Safekeep once).")
-                    .font(.footnote).foregroundStyle(.secondary)
+                    .font(Theme.rounded(.footnote)).foregroundStyle(Theme.sage)
             case .notDetermined:
-                Text("Open Safekeep once to allow Photos access.").font(.footnote).foregroundStyle(.secondary)
+                Text("Open Safekeep once to allow Photos access.").font(Theme.rounded(.footnote)).foregroundStyle(Theme.sage)
             default:
                 if recents.status == .limited {
                     HStack {
-                        Text("Showing only the photos you allowed.").font(.caption).foregroundStyle(.secondary)
+                        Text("Showing only the photos you allowed.").font(Theme.rounded(.caption)).foregroundStyle(Theme.sage)
                         Spacer()
                         Button("Change access") {
                             if let vc = presenter.vc { PHPhotoLibrary.shared().presentLimitedLibraryPicker(from: vc) }
                         }
-                        .font(.caption)
+                        .font(Theme.rounded(.caption, .semibold)).foregroundStyle(Theme.peach)
                     }
                 }
                 if recents.assets.isEmpty {
-                    Text(recents.loading ? "Loading…" : "No photos found.").font(.footnote).foregroundStyle(.secondary)
+                    Text(recents.loading ? "Loading…" : "No photos found.").font(Theme.rounded(.footnote)).foregroundStyle(Theme.sage)
                 }
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: columns), spacing: 3) {
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: columns), spacing: 6) {
                     ForEach(recents.assets, id: \.localIdentifier) { a in
                         Button { onTap(a) } label: {
                             PhotoThumb(asset: a, manager: recents.caching)
                                 .overlay {
                                     if a.localIdentifier == selectedID {
-                                        RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor, lineWidth: 4)
+                                        RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Theme.peach, lineWidth: 4)
                                         Image(systemName: "checkmark.circle.fill").font(.title2)
-                                            .foregroundStyle(.white, Color.accentColor)
+                                            .foregroundStyle(Theme.onPeach, Theme.peach)
                                     }
                                 }
-                                .clipShape(RoundedRectangle(cornerRadius: 4))
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                         .buttonStyle(.plain)
                         .disabled(disabled)

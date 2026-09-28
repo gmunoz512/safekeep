@@ -24,6 +24,10 @@ final class MessagesViewController: MSMessagesAppViewController {
                                      openApp: { [weak self] in self?.openContainingApp() },
                                      insertLog: { [weak self] in self?.insertLogIntoMessage() })
         let h = UIHostingController(rootView: root)
+        h.overrideUserInterfaceStyle = .dark
+        overrideUserInterfaceStyle = .dark
+        view.backgroundColor = UIColor(red: 0x0E / 255, green: 0x4F / 255, blue: 0x57 / 255, alpha: 1)
+        h.view.backgroundColor = .clear
         addChild(h)
         h.view.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(h.view)
@@ -135,6 +139,8 @@ struct ExtensionRootView: View {
     @State private var showLog = false
 
     var body: some View {
+        ZStack {
+        Theme.background
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
@@ -158,18 +164,22 @@ struct ExtensionRootView: View {
                 if b { withAnimation { proxy.scrollTo("top", anchor: .top) } }
             }
         }
+        }
+        .tint(Theme.peach)
+        .environment(\.colorScheme, .dark)
     }
 
     private var header: some View {
-        HStack {
-            Text("Safekeep").font(.headline)
+        HStack(spacing: 10) {
+            Image("Logo").resizable().frame(width: 30, height: 30)
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            Text("Safekeep").font(Theme.rounded(.title3, .bold)).foregroundStyle(Theme.cream)
             Spacer()
             Button(showLog ? "Hide log" : "Log") {
                 showLog.toggle()
                 if showLog { requestExpand() }
             }
-            .font(.footnote)
-            .buttonStyle(.bordered)
+            .buttonStyle(SoftButtonStyle())
         }
     }
 
@@ -182,25 +192,25 @@ struct ExtensionRootView: View {
                 Spacer()
                 Button(showLog ? "Hide" : "Show") { showLog.toggle(); if showLog { requestExpand() } }
             }
-            .font(.footnote)
-            .buttonStyle(.bordered)
+            .buttonStyle(SoftButtonStyle())
             HStack(spacing: 10) {
                 Button("Reload photos") { Task { await recents.load(reason: "manual") } }
                 Button("Check clipboard") { m.checkClipboard(trigger: "manual") }
                 Spacer()
                 Button("Clear log", role: .destructive) { m.clearLog() }
             }
-            .font(.caption)
+            .buttonStyle(SoftButtonStyle())
             if showLog {
                 ScrollView {
                     Text(m.log)
                         .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(Theme.cream.opacity(0.85))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                         .padding(6)
                 }
                 .frame(height: 260)
-                .background(RoundedRectangle(cornerRadius: 8).fill(Color(uiColor: .secondarySystemBackground)))
+                .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.black.opacity(0.2)))
             }
         }
     }
@@ -218,23 +228,21 @@ struct ExtensionRootView: View {
     }
 
     private var permissionCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(recents.status == .notDetermined ? "Safekeep needs access to your photos." : "Open Safekeep once to allow Photos access.")
-                .font(.subheadline.weight(.semibold))
+                .font(Theme.rounded(.subheadline, .semibold)).foregroundStyle(Theme.cream)
             if recents.status == .notDetermined {
                 Button("Allow Photos access") {
                     Task { await recents.requestAccess(); await recents.load(reason: "after permission request") }
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(PeachButtonStyle())
                 Text("If nothing happens, open the Safekeep app once and allow Full Access.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(Theme.rounded(.caption)).foregroundStyle(Theme.sage)
             } else {
                 Text("Photos access is off. Open the Safekeep app (or Settings > Privacy & Security > Photos) and choose Full Access.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(Theme.rounded(.caption)).foregroundStyle(Theme.sage)
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Color.orange.opacity(0.12)))
+        .themeCard()
     }
 }

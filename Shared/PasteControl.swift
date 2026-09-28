@@ -37,8 +37,8 @@ final class PasteHostView: UIView {
         let cfg = UIPasteControl.Configuration()
         cfg.displayMode = .iconAndLabel
         cfg.cornerStyle = .capsule
-        cfg.baseBackgroundColor = .systemBlue
-        cfg.baseForegroundColor = .white
+        cfg.baseBackgroundColor = Theme.uiPeach
+        cfg.baseForegroundColor = Theme.uiOnPeach
         control = UIPasteControl(configuration: cfg)
         super.init(frame: frame)
         pasteConfiguration = UIPasteConfiguration(acceptableTypeIdentifiers: AddSoundModel.pasteTypeIdentifiers)

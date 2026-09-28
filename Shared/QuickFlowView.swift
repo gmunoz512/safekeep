@@ -32,40 +32,58 @@ struct QuickFlowView: View {
     }
 
     private var clipboardCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             if m.audioURL == nil {
                 if m.clipboardOffer != nil {
-                    Label("Voice note copied — tap to use", systemImage: "waveform").font(.headline)
+                    Label("Voice note copied — tap to use", systemImage: "waveform")
+                        .font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.cream)
                 } else {
-                    Text("1. In the chat, hold the voice note → Copy").font(.subheadline)
-                    Text("2. Come back here and tap Paste").font(.subheadline)
+                    VStack(alignment: .leading, spacing: 6) {
+                        numbered(1, "In the chat, hold the voice note → Copy")
+                        numbered(2, "Come back here and tap Paste")
+                    }
                 }
                 HStack(spacing: 12) {
                     pasteButton.frame(width: 210, height: 52)
-                    Button("Paste another way") { onNeedRoom(); Task { await m.pasteAudio() } }.font(.footnote)
+                    Button("Paste another way") { onNeedRoom(); Task { await m.pasteAudio() } }
+                        .buttonStyle(SoftButtonStyle())
                 }
-                HStack(spacing: 16) {
+                HStack(spacing: 8) {
                     Button { onNeedRoom(); m.say("Choose audio file tapped"); showDocPicker = true } label: {
                         Label("Choose audio file", systemImage: "folder")
                     }
+                    .buttonStyle(SoftButtonStyle())
                     if let openApp {
-                        Button { openApp() } label: { Label("Open Safekeep app", systemImage: "arrow.up.forward.app") }
+                        Button { openApp() } label: { Label("Open Safekeep", systemImage: "arrow.up.forward.app") }
+                            .buttonStyle(SoftButtonStyle())
                     }
-                    Spacer()
-                    if m.clipboardOffer != nil { Button("Not now") { m.dismissClipboardOffer() } }
+                    Spacer(minLength: 0)
+                    if m.clipboardOffer != nil {
+                        Button("Not now") { m.dismissClipboardOffer() }
+                            .font(Theme.rounded(.footnote)).foregroundStyle(Theme.sage)
+                    }
                 }
-                .font(.footnote)
             }
             statusLines
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 14)
-            .fill(m.clipboardOffer != nil && m.audioURL == nil ? Color.accentColor.opacity(0.14) : Color(uiColor: .secondarySystemBackground)))
+        .themeCard()
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .stroke(Theme.peach.opacity(m.clipboardOffer != nil && m.audioURL == nil ? 0.8 : 0), lineWidth: 1.5))
         .sheet(isPresented: $showDocPicker) {
             AudioDocPicker(isPresented: $showDocPicker) { url in Task { await m.pickedFile(url) } }
         }
         .onAppear { m.checkClipboard(trigger: "card appeared") }
+    }
+
+    private func numbered(_ n: Int, _ text: String) -> some View {
+        HStack(spacing: 10) {
+            Text("\(n)")
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(Theme.onPeach)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(Theme.peach))
+            Text(text).font(Theme.rounded(.subheadline)).foregroundStyle(Theme.cream)
+        }
     }
 
     /// Always-visible status: live clipboard types, paste button state, and the result of the last tap.
@@ -76,59 +94,63 @@ struct QuickFlowView: View {
                 Text(e ? "Paste button: active" : "Paste button: greyed out (iOS reports no audio on the clipboard for Safekeep)")
             }
             if !m.pasteStatus.isEmpty {
-                Text(m.pasteStatus).foregroundStyle(m.pasteStatusIsError ? Color.orange : Color.primary)
+                Text(m.pasteStatus).foregroundStyle(m.pasteStatusIsError ? Theme.warning : Theme.cream)
             }
             if m.clipboardUnreadable && m.audioURL == nil {
-                Text("Safekeep can't read the clipboard from inside Messages on this iPhone. Use \"Choose audio file\"\(openApp != nil ? ", or \"Open Safekeep app\" to paste there" : "").")
-                    .foregroundStyle(Color.orange)
+                Text("Safekeep can't read the clipboard from inside Messages on this iPhone. Use \"Choose audio file\"\(openApp != nil ? ", or \"Open Safekeep\" to paste there" : "").")
+                    .foregroundStyle(Theme.warning)
             }
         }
-        .font(.caption2.monospaced())
-        .foregroundStyle(.secondary)
+        .font(.system(size: 10, design: .monospaced))
+        .foregroundStyle(Theme.sage)
         .textSelection(.enabled)
     }
 
     private var busyRow: some View {
-        HStack(spacing: 8) {
-            ProgressView()
+        HStack(spacing: 10) {
+            ProgressView().tint(Theme.peach)
             Text(m.downloadProgress.map { "Downloading photo from iCloud… \(Int($0 * 100))%" } ?? "Working…")
-                .font(.subheadline)
+                .font(Theme.rounded(.subheadline)).foregroundStyle(Theme.cream)
         }
     }
 
     private var soundReadyRow: some View {
-        HStack {
-            Image(systemName: "waveform.circle.fill").font(.title2).foregroundStyle(.green)
+        HStack(spacing: 12) {
+            Image(systemName: "waveform").font(.system(size: 18, weight: .bold))
+                .foregroundStyle(Theme.onPeach)
+                .frame(width: 38, height: 38).background(Circle().fill(Theme.peach))
             VStack(alignment: .leading, spacing: 2) {
-                Text("Sound ready: \(String(format: "%.1f", m.audioDuration)) s").font(.headline)
-                Text(m.selectedForSave == nil ? "Now tap a photo below" : "Saving…").font(.caption).foregroundStyle(.secondary)
+                Text("Sound ready: \(String(format: "%.1f", m.audioDuration)) s").font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.cream)
+                Text(m.selectedForSave == nil ? "Now tap a photo below" : "Saving…").font(Theme.rounded(.caption)).foregroundStyle(Theme.sage)
             }
             Spacer()
             Button { m.togglePlay() } label: {
                 Label(m.isPlaying ? "Stop" : "Play", systemImage: m.isPlaying ? "stop.fill" : "play.fill")
             }
-            .buttonStyle(.bordered)
-            Button { m.clearSound() } label: { Image(systemName: "xmark") }
+            .buttonStyle(SoftButtonStyle())
+            Button { m.clearSound() } label: { Image(systemName: "xmark").foregroundStyle(Theme.sage) }
                 .buttonStyle(.borderless)
         }
+        .themeCard(padding: 12)
     }
 
     private func pendingRow(_ a: PHAsset) -> some View {
-        HStack {
+        HStack(spacing: 12) {
             PhotoThumb(asset: a, manager: recents.caching).frame(width: 44, height: 44)
-                .clipShape(RoundedRectangle(cornerRadius: 4))
-            Text("Photo selected — paste the voice note to save").font(.subheadline)
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            Text("Photo selected — paste the voice note to save").font(Theme.rounded(.subheadline)).foregroundStyle(Theme.cream)
             Spacer()
-            Button("Cancel") { m.cancelSelection() }.font(.footnote)
+            Button("Cancel") { m.cancelSelection() }.font(Theme.rounded(.footnote)).foregroundStyle(Theme.peach)
         }
+        .themeCard(padding: 12)
     }
 
     private var recentSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Recent photos").font(.headline)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Recent photos").font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.cream)
                 Spacer()
-                Text("newest added first").font(.caption2).foregroundStyle(.secondary)
+                Text("newest added first").font(Theme.rounded(.caption2)).foregroundStyle(Theme.sage)
             }
             RecentPhotosGrid(recents: recents, selectedID: m.selectedForSave?.localIdentifier ?? m.confirmAsset?.localIdentifier,
                              disabled: m.busy, columns: columns, presenter: presenter) { asset in

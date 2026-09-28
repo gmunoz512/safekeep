@@ -38,6 +38,8 @@
 		B1000000000000000000002A /* SoundPhotoTestMessages.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B2000000000000000000000C /* SoundPhotoTestMessages.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B1000000000000000000F001 /* MainInterface.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000F001 /* MainInterface.storyboard */; };
 		B1000000000000000000F002 /* Pickers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* Pickers.swift */; };
+		B1000000000000000000F003 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000F003 /* Theme.swift */; };
+		B1000000000000000000F004 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000F003 /* Theme.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -91,6 +93,7 @@
 		B2000000000000000000000B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B2000000000000000000000C /* SoundPhotoTestMessages.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SoundPhotoTestMessages.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2000000000000000000F001 /* MainInterface.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = MainInterface.storyboard; sourceTree = "<group>"; };
+		B2000000000000000000F003 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -162,6 +165,7 @@
 			isa = PBXGroup;
 			children = (
 				B20000000000000000000001 /* SharedTypes.swift */,
+				B2000000000000000000F003 /* Theme.swift */,
 				B20000000000000000000002 /* RecentPhotos.swift */,
 				B20000000000000000000003 /* PasteControl.swift */,
 				B20000000000000000000004 /* LivePhotoPreview.swift */,
@@ -295,6 +299,7 @@
 				A1000000000000000000000A /* AddSoundModel.swift in Sources */,
 				A10000000000000000000009 /* AddSoundView.swift in Sources */,
 				B10000000000000000000019 /* SharedTypes.swift in Sources */,
+				B1000000000000000000F003 /* Theme.swift in Sources */,
 				B1000000000000000000001A /* RecentPhotos.swift in Sources */,
 				B1000000000000000000001B /* PasteControl.swift in Sources */,
 				B1000000000000000000001C /* LivePhotoPreview.swift in Sources */,
@@ -309,6 +314,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B10000000000000000000020 /* SharedTypes.swift in Sources */,
+				B1000000000000000000F004 /* Theme.swift in Sources */,
 				B10000000000000000000021 /* RecentPhotos.swift in Sources */,
 				B10000000000000000000022 /* PasteControl.swift in Sources */,
 				B10000000000000000000023 /* LivePhotoPreview.swift in Sources */,

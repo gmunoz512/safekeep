@@ -29,6 +29,8 @@ struct AddSoundView: View {
             }
             .padding()
         }
+        .background(Theme.background)
+        .tint(Theme.peach)
         .navigationTitle("Add Sound (debug)")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
