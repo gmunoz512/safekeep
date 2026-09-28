@@ -29,6 +29,10 @@ struct SetupView: View {
 
                     Text("A new Live Photo with the sound is saved next to the original, in the album \"Sound Photos\". The original is never changed. Press and hold it in Photos to hear it.")
                         .font(.footnote).foregroundStyle(.secondary)
+
+                    Text(Self.buildInfo)
+                        .font(.caption2.monospaced()).foregroundStyle(.tertiary)
+                        .textSelection(.enabled)
                 }
                 .padding()
             }
@@ -50,6 +54,22 @@ struct SetupView: View {
                 if p == .active { status = PHPhotoLibrary.authorizationStatus(for: .readWrite) }
             }
         }
+    }
+
+    /// Shows which build is installed and whether the iMessage extension is inside it (for troubleshooting the + drawer).
+    static var buildInfo: String {
+        let info = Bundle.main.infoDictionary ?? [:]
+        var lines = ["Sound Photo \(info["CFBundleShortVersionString"] ?? "?") (build \(info["CFBundleVersion"] ?? "?"))"]
+        let dir = Bundle.main.builtInPlugInsURL
+        let appexes = (dir.flatMap { try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil) } ?? [])
+            .filter { $0.pathExtension == "appex" }
+        if appexes.isEmpty { lines.append("iMessage extension: NOT FOUND in this install") }
+        for u in appexes {
+            let b = Bundle(url: u)
+            let ext = b?.infoDictionary?["NSExtension"] as? [String: Any]
+            lines.append("iMessage extension: \(u.lastPathComponent) · \(b?.bundleIdentifier ?? "?") · \(ext?["NSExtensionPointIdentifier"] ?? "?") · build \(b?.infoDictionary?["CFBundleVersion"] ?? "?")")
+        }
+        return lines.joined(separator: "\n")
     }
 
     private var permissionCard: some View {
