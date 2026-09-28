@@ -11,6 +11,7 @@ struct QuickPasteView: View {
     let onClose: () -> Void
     @StateObject private var m = AddSoundModel()
     @StateObject private var recents = RecentPhotosModel()
+    @EnvironmentObject private var router: AppRouter
     @Environment(\.scenePhase) private var scenePhase
     @State private var autoPasteDone = false
     @State private var pasting = false
@@ -55,7 +56,17 @@ struct QuickPasteView: View {
                 if recents.status == .notDetermined { await recents.requestAccess() }
                 await recents.load(reason: "quick paste screen")
             }
-            scheduleAutoPaste(reason: "appear")
+            if let file = router.pendingFile {
+                router.pendingFile = nil
+                autoPasteDone = true   // a chosen file replaces the clipboard paste
+                m.say("chosen audio file: \(file.lastPathComponent)")
+                Task {
+                    await m.pickedFile(file)
+                    if m.audioURL != nil { m.setPasteStatus("Voice note ready: \(String(format: "%.1f", m.audioDuration)) s") }
+                }
+            } else {
+                scheduleAutoPaste(reason: "appear")
+            }
         }
         .onChange(of: scenePhase) { p in
             m.say("scenePhase → \(p == .active ? "active" : p == .inactive ? "inactive" : "background")")

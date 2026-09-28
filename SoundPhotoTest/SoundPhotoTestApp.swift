@@ -17,9 +17,17 @@ final class AppRouter: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.showQuickPaste = true }
     }
 
+    /// Audio file picked on the main screen; the quick paste screen loads it instead of pasting.
+    @Published var pendingFile: URL?
+
     func openQuickPaste(reason: String) {
         print("[router] quick paste opened: \(reason)")
         showQuickPaste = true
+    }
+
+    func openQuickPaste(file: URL) {
+        pendingFile = file
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.showQuickPaste = true }
     }
 }
 
@@ -34,6 +42,7 @@ struct SoundPhotoTestApp: App {
                 .onOpenURL { url in router.handle(url, via: "onOpenURL") }
                 .fullScreenCover(isPresented: $router.showQuickPaste) {
                     QuickPasteView { router.showQuickPaste = false }
+                        .environmentObject(router)
                 }
         }
     }

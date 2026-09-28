@@ -26,7 +26,7 @@ final class MessagesViewController: MSMessagesAppViewController {
         let h = UIHostingController(rootView: root)
         h.overrideUserInterfaceStyle = .dark
         overrideUserInterfaceStyle = .dark
-        view.backgroundColor = UIColor(red: 0x0E / 255, green: 0x4F / 255, blue: 0x57 / 255, alpha: 1)
+        view.backgroundColor = Theme.uiBackground
         h.view.backgroundColor = .clear
         addChild(h)
         h.view.translatesAutoresizingMaskIntoConstraints = false
@@ -187,23 +187,23 @@ struct ExtensionRootView: View {
 
     /// Paste and drag are blocked for Messages extensions, so the main action hands off to the app.
     private var addCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 14) {
             if m.audioURL == nil {
-                Button { openApp() } label: {
-                    Label("Add copied voice note", systemImage: "waveform")
+                HeroCard(title: "Add copied voice note",
+                         subtitle: "In the chat, hold the voice note → Copy, then tap here") { openApp() }
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Or add it another way").font(.system(.subheadline)).foregroundStyle(Theme.secondaryText)
+                    Button { requestExpand(); m.say("Choose audio file tapped"); showDocPicker = true } label: {
+                        PillLabel(title: "Choose audio file", icon: "folder")
+                    }
+                    .buttonStyle(PillButtonStyle())
+                    Text("Or: hold the voice note → Save to Voice Memos, then in Voice Memos ••• → Share → Safekeep")
+                        .font(.system(.caption)).foregroundStyle(Theme.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .buttonStyle(PeachButtonStyle())
-                Text("In the chat, hold the voice note → Copy, then tap here")
-                    .font(Theme.rounded(.subheadline, .medium)).foregroundStyle(Theme.cream)
-                Text("Or: hold the voice note → Save to Voice Memos, then in Voice Memos ••• → Share → Safekeep")
-                    .font(Theme.rounded(.caption)).foregroundStyle(Theme.sage)
-                Button { requestExpand(); m.say("Choose audio file tapped"); showDocPicker = true } label: {
-                    Label("Choose audio file", systemImage: "folder")
-                }
-                .buttonStyle(SoftButtonStyle())
+                .themeCard(padding: 16)
             }
         }
-        .themeCard()
         .sheet(isPresented: $showDocPicker) {
             AudioDocPicker(isPresented: $showDocPicker) { url in Task { await m.pickedFile(url) } }
         }

@@ -17,7 +17,7 @@ final class ShareViewController: UIViewController {
         model.say(Mem.line("viewDidLoad"))
 
         overrideUserInterfaceStyle = .dark
-        view.backgroundColor = UIColor(red: 0x0E / 255, green: 0x4F / 255, blue: 0x57 / 255, alpha: 1)
+        view.backgroundColor = Theme.uiBackground
         let root = ShareRootView(m: model, recents: recents,
                                  done: { [weak self] in self?.finish() },
                                  cancel: { [weak self] in self?.cancel() })

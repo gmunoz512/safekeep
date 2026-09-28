@@ -1,12 +1,13 @@
 import Photos
 import SwiftUI
 
-/// First (and usually only) screen of the app: allow Photos access + how to use it inside Messages.
+/// Main screen (matches German's mockup): paste hero card, other ways, how-to, Photos access.
 struct SetupView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     @State private var showDebug = false
-    @State private var showMatrix = false
+    @State private var showDocPicker = false
+    @State private var showVoiceMemosHelp = false
     @EnvironmentObject private var router: AppRouter
     @State private var clipAudioTypes: [String] = []
 
@@ -15,34 +16,47 @@ struct SetupView: View {
             ZStack {
                 Theme.background
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
-                        if !clipAudioTypes.isEmpty { pasteCard }
+                    VStack(spacing: 22) {
                         header
+                        HeroCard(title: "Paste voice note",
+                                 subtitle: clipAudioTypes.isEmpty
+                                    ? "Copy a voice note in Messages, then tap here"
+                                    : "A voice note is on your clipboard. Tap to add it to a photo.") {
+                            router.openQuickPaste(reason: "hero card (clipboard audio: \(clipAudioTypes.isEmpty ? "none" : clipAudioTypes.joined(separator: ", ")))")
+                        }
+                        otherWaysCard
+                        howToCard
                         permissionCard
-                        stepsCard
                         Text("A new Live Photo with the sound is saved next to the original, in the album \"Safekeep\". The original is never changed. Press and hold it in Photos to hear it.")
-                            .font(Theme.rounded(.footnote))
-                            .foregroundStyle(Theme.sage)
+                            .font(.system(.footnote))
+                            .foregroundStyle(Theme.secondaryText)
+                            .multilineTextAlignment(.center)
                             .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 8)
                     }
-                    .padding(.horizontal, 22)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 24)
                 }
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button("Add Sound (debug)") { showDebug = true }
-                        Button("Test matrix") { showMatrix = true }
-                    } label: {
-                        Image(systemName: "ladybug").font(.caption2).foregroundStyle(Theme.sage.opacity(0.35))
+                    Button { showDebug = true } label: {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(Theme.secondaryText)
+                            .frame(width: 38, height: 38)
+                            .background(Circle().fill(Theme.cardTeal.opacity(0.7)))
+                            .overlay(Circle().stroke(Theme.secondaryTeal, lineWidth: 1))
                     }
-                    .accessibilityLabel("Debug tools")
+                    .accessibilityLabel("Settings and debug tools")
                 }
             }
             .toolbarBackground(.hidden, for: .navigationBar)
             .navigationDestination(isPresented: $showDebug) { AddSoundView() }
-            .navigationDestination(isPresented: $showMatrix) { ContentView().navigationTitle("Test matrix") }
+            .sheet(isPresented: $showDocPicker) {
+                AudioDocPicker(isPresented: $showDocPicker) { url in router.openQuickPaste(file: url) }
+            }
+            .sheet(isPresented: $showVoiceMemosHelp) { voiceMemosHelp }
             .onChange(of: scenePhase) { p in
                 if p == .active { status = PHPhotoLibrary.authorizationStatus(for: .readWrite); refreshClipboard() }
             }
@@ -50,7 +64,7 @@ struct SetupView: View {
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in refreshClipboard() }
             .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in refreshClipboard() }
         }
-        .tint(Theme.peach)
+        .tint(Theme.softSand)
         .preferredColorScheme(.dark)
     }
 
@@ -60,100 +74,91 @@ struct SetupView: View {
         if types != clipAudioTypes { clipAudioTypes = types }
     }
 
-    private var pasteCard: some View {
-        Button { router.openQuickPaste(reason: "setup paste card (\(clipAudioTypes.joined(separator: ", ")))") } label: {
-            HStack(spacing: 14) {
-                Image(systemName: "waveform")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(Theme.peach)
-                    .frame(width: 44, height: 44)
-                    .background(Circle().fill(Theme.onPeach))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Paste voice note").font(Theme.rounded(.title3, .bold))
-                    Text("A voice note is on your clipboard. Tap to add it to a photo.")
-                        .font(Theme.rounded(.subheadline))
-                        .multilineTextAlignment(.leading)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right").font(.system(size: 15, weight: .bold))
-            }
-            .foregroundStyle(Theme.onPeach)
-            .padding(18)
-            .frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.peach))
-            .shadow(color: .black.opacity(0.25), radius: 10, y: 5)
-        }
-        .buttonStyle(.plain)
-    }
-
     private var header: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 12) {
             Image("Logo")
                 .resizable()
-                .frame(width: 96, height: 96)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .shadow(color: .black.opacity(0.3), radius: 12, y: 6)
+                .frame(width: 104, height: 104)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .shadow(color: .black.opacity(0.35), radius: 16, y: 8)
             Text("Safekeep")
-                .font(Theme.rounded(.largeTitle, .bold))
-                .foregroundStyle(Theme.cream)
+                .font(.system(size: 38, weight: .bold))
+                .foregroundStyle(Theme.primaryText)
             Text("Add a voice note to a photo, remember it forever.")
-                .font(Theme.rounded(.title3, .medium))
-                .foregroundStyle(Theme.cream.opacity(0.92))
+                .font(.system(.title3))
+                .foregroundStyle(Theme.secondaryText)
                 .multilineTextAlignment(.center)
             Text("You only need to open this app once.")
-                .font(Theme.rounded(.subheadline))
-                .foregroundStyle(Theme.sage)
+                .font(.system(.footnote))
+                .foregroundStyle(Theme.secondaryText.opacity(0.7))
         }
         .frame(maxWidth: .infinity)
-        .padding(.top, 8)
     }
 
-    private var stepsCard: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            tip
-            optionCard("Option A — Copy", icon: "doc.on.doc", steps: [
-                ("In Messages, hold the voice note → Copy.", nil),
-                ("Tap + → Safekeep → Add copied voice note.", nil),
-                ("Tap the photo. Done.", nil),
-            ])
-            optionCard("Option B — Voice Memos", icon: "waveform", steps: [
-                ("Hold the voice note → Save to Voice Memos.", nil),
-                ("In Voice Memos, open it → ••• → Share → Safekeep.", nil),
-                ("Tap the photo. Done.", nil),
-            ])
-        }
-    }
-
-    private var tip: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "photo.badge.arrow.down")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(Theme.peach)
-                .frame(width: 32, height: 32)
-                .background(Circle().fill(Theme.peach.opacity(0.16)))
-            VStack(alignment: .leading, spacing: 2) {
-                Text("First, save the photo").font(Theme.rounded(.subheadline, .semibold)).foregroundStyle(Theme.cream)
-                Text("Save the photo from the chat first: hold it → Save.")
-                    .font(Theme.rounded(.subheadline)).foregroundStyle(Theme.sage)
-                    .fixedSize(horizontal: false, vertical: true)
+    private var otherWaysCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Or add it another way").font(.system(.subheadline)).foregroundStyle(Theme.secondaryText)
+            HStack(spacing: 12) {
+                Button { showDocPicker = true } label: { PillLabel(title: "Choose audio file", icon: "folder") }
+                    .buttonStyle(PillButtonStyle())
+                Button { showVoiceMemosHelp = true } label: { PillLabel(title: "From Voice Memos", icon: "waveform") }
+                    .buttonStyle(PillButtonStyle())
             }
         }
-        .padding(.horizontal, 4)
+        .themeCard(padding: 16)
     }
 
-    private func optionCard(_ title: String, icon: String, steps: [(String, String?)]) -> some View {
+    private var howToCard: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Label(title, systemImage: icon)
-                .font(Theme.rounded(.headline, .semibold))
-                .foregroundStyle(Theme.cream)
-            ForEach(Array(steps.enumerated()), id: \.offset) { i, st in
-                step(i + 1, st.0, st.1)
-            }
+            Text("How to use it in Messages").font(.system(.title3).weight(.semibold)).foregroundStyle(Theme.primaryText)
+            Text("First save the photo from the chat: hold it → Save.")
+                .font(.system(.subheadline)).foregroundStyle(Theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+            routeTitle("Copy")
+            StepList(steps: [
+                ("Hold the voice note → Copy", nil),
+                ("Tap + → Safekeep → Add copied voice note", nil),
+                ("Tap the photo. Done.", nil),
+            ])
+            routeTitle("Voice Memos")
+            StepList(steps: [
+                ("Hold the voice note → Save to Voice Memos", nil),
+                ("In Voice Memos: open it → ••• → Share → Safekeep", nil),
+                ("Tap the photo. Done.", nil),
+            ])
         }
         .themeCard(padding: 20)
     }
 
-    /// Shows which build is installed and whether the iMessage extension is inside it (for troubleshooting the + drawer).
+    private func routeTitle(_ t: String) -> some View {
+        Text(t.uppercased())
+            .font(.system(.caption).weight(.semibold))
+            .tracking(1)
+            .foregroundStyle(Theme.softSand)
+            .padding(.top, 2)
+    }
+
+    private var voiceMemosHelp: some View {
+        ZStack {
+            Theme.background
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Add from Voice Memos").font(.system(.title2).weight(.semibold)).foregroundStyle(Theme.primaryText)
+                StepList(steps: [
+                    ("In Messages, hold the voice note", "Tap Save to Voice Memos."),
+                    ("Open Voice Memos", "Tap the recording, then ••• → Share."),
+                    ("Choose Safekeep", "It may be under More the first time."),
+                    ("Tap the photo", "The Live Photo with the sound is saved. Done."),
+                ])
+                Spacer()
+                Button("Got it") { showVoiceMemosHelp = false }.buttonStyle(PeachButtonStyle())
+            }
+            .padding(24)
+        }
+        .presentationDetents([.medium, .large])
+        .preferredColorScheme(.dark)
+    }
+
+    /// Shows which build is installed and which extensions are inside it (debug screen).
     static var buildInfo: String {
         let info = Bundle.main.infoDictionary ?? [:]
         var lines = ["Safekeep \(info["CFBundleShortVersionString"] ?? "?") (build \(info["CFBundleVersion"] ?? "?"))"]
@@ -170,37 +175,39 @@ struct SetupView: View {
         return lines.joined(separator: "\n")
     }
 
+
     private var permissionCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 14) {
-                ZStack {
-                    Circle().fill(status == .authorized ? Theme.peach : Theme.peach.opacity(0.18)).frame(width: 40, height: 40)
-                    Image(systemName: status == .authorized ? "checkmark" : "photo.on.rectangle")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(status == .authorized ? Theme.onPeach : Theme.peach)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Photos access").font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.cream)
-                    Text(RecentPhotosModel.describe(status)).font(Theme.rounded(.subheadline)).foregroundStyle(Theme.sage)
+            HStack(spacing: 16) {
+                Image(systemName: status == .authorized ? "checkmark" : "photo.on.rectangle")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(Theme.deepPetrol)
+                    .frame(width: 52, height: 52)
+                    .background(Circle().fill(status == .authorized ? Theme.secondaryText.opacity(0.9) : Theme.mutedGold))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Photos access").font(.system(.headline).weight(.semibold)).foregroundStyle(Theme.primaryText)
+                    Text(status == .authorized ? "Full Access" : RecentPhotosModel.describe(status))
+                        .font(.system(.subheadline)).foregroundStyle(Theme.secondaryText)
                 }
                 Spacer()
             }
+            Rectangle().fill(Theme.secondaryTeal).frame(height: 1)
             switch status {
             case .authorized:
                 Text("All set. You can close this app and use Safekeep in Messages.")
-                    .font(Theme.rounded(.subheadline)).foregroundStyle(Theme.cream.opacity(0.9))
+                    .font(.system(.subheadline)).foregroundStyle(Theme.secondaryText)
             case .notDetermined:
                 Button("Allow Photos access") {
                     Task { status = await PHPhotoLibrary.requestAuthorization(for: .readWrite) }
                 }
                 .buttonStyle(PeachButtonStyle())
-                Text("Choose \"Allow Full Access\" so your most recently saved photos show up in Messages.")
-                    .font(Theme.rounded(.caption)).foregroundStyle(Theme.sage)
+                Text("Choose \"Allow Full Access\" so your most recently saved photos show up.")
+                    .font(.system(.caption)).foregroundStyle(Theme.secondaryText)
             default:
                 Text(status == .limited
                      ? "Only some photos are shared. For newly saved photos to show up, choose Full Access."
                      : "Photos access is off. Turn it on to save sound photos.")
-                    .font(Theme.rounded(.subheadline)).foregroundStyle(Theme.cream.opacity(0.9))
+                    .font(.system(.subheadline)).foregroundStyle(Theme.secondaryText)
                 Button("Open Settings → Photos → Full Access") {
                     if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }
                 }
@@ -208,23 +215,5 @@ struct SetupView: View {
             }
         }
         .themeCard(padding: 20)
-    }
-
-    private func step(_ n: Int, _ title: String, _ detail: String?) -> some View {
-        HStack(alignment: .center, spacing: 14) {
-            Text("\(n)")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(Theme.onPeach)
-                .frame(width: 32, height: 32)
-                .background(Circle().fill(Theme.peach))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(Theme.rounded(.subheadline, .medium)).foregroundStyle(Theme.cream)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let detail {
-                    Text(detail).font(Theme.rounded(.subheadline)).foregroundStyle(Theme.sage)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-        }
     }
 }
