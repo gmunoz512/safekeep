@@ -377,7 +377,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SoundPhotoTest/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_CFBundleDisplayName = "Sound Photo";
+				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
@@ -408,7 +408,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SoundPhotoTest/Info.plist;
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
-				INFOPLIST_KEY_CFBundleDisplayName = "Sound Photo";
+				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
@@ -439,7 +439,7 @@
 				DEVELOPMENT_TEAM = W8YUDW42LL;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SoundPhotoTestMessages/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Sound Photo";
+				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
@@ -469,7 +469,7 @@
 				DEVELOPMENT_TEAM = W8YUDW42LL;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SoundPhotoTestMessages/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Sound Photo";
+				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";

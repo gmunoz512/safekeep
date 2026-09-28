@@ -45,7 +45,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var recordURL: URL?
     private var player: AVAudioPlayer?
 
-    static let albumName = "Sound Photos"
+    static let albumName = "Safekeep"
     static let testAlbumName = "Sound Photo Tests"
 
     nonisolated static let knownAudioTypes = [

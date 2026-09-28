@@ -17,7 +17,7 @@ final class MessagesViewController: MSMessagesAppViewController {
         model.movieMaxSide = 1440
         model.confirmBeforeSave = false
         recents.log = { [weak model = self.model] s in model?.say(s) }
-        model.say("=== Sound Photo iMessage extension — build \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "?") — \(Date()) ===")
+        model.say("=== Safekeep iMessage extension — build \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "?") — \(Date()) ===")
         model.say(Mem.line("viewDidLoad"))
         let root = ExtensionRootView(m: model, recents: recents, ui: ui,
                                      requestExpand: { [weak self] in self?.expandIfNeeded() })
@@ -128,7 +128,7 @@ struct ExtensionRootView: View {
 
     private var header: some View {
         HStack {
-            Text("Sound Photo").font(.headline)
+            Text("Safekeep").font(.headline)
             Spacer()
             Menu {
                 Button(showLog ? "Hide log" : "Show log") { showLog.toggle(); if showLog { requestExpand() } }
@@ -144,17 +144,17 @@ struct ExtensionRootView: View {
 
     private var permissionCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(recents.status == .notDetermined ? "Sound Photo needs access to your photos." : "Open Sound Photo once to allow Photos access.")
+            Text(recents.status == .notDetermined ? "Safekeep needs access to your photos." : "Open Safekeep once to allow Photos access.")
                 .font(.subheadline.weight(.semibold))
             if recents.status == .notDetermined {
                 Button("Allow Photos access") {
                     Task { await recents.requestAccess(); await recents.load(reason: "after permission request") }
                 }
                 .buttonStyle(.borderedProminent)
-                Text("If nothing happens, open the Sound Photo app once and allow Full Access.")
+                Text("If nothing happens, open the Safekeep app once and allow Full Access.")
                     .font(.caption).foregroundStyle(.secondary)
             } else {
-                Text("Photos access is off. Open the Sound Photo app (or Settings > Privacy & Security > Photos) and choose Full Access.")
+                Text("Photos access is off. Open the Safekeep app (or Settings > Privacy & Security > Photos) and choose Full Access.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

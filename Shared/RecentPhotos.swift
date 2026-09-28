@@ -149,7 +149,7 @@ final class RecentPhotosModel: NSObject, ObservableObject, PHPhotoLibraryChangeO
 
     nonisolated static func ownAlbumAssetIDs() -> Set<String> {
         var ids = Set<String>()
-        for name in ["Sound Photos", "Sound Photo Tests"] {
+        for name in ["Safekeep", "Sound Photos", "Sound Photo Tests"] {
             let o = PHFetchOptions(); o.predicate = NSPredicate(format: "title = %@", name)
             PHAssetCollection.fetchAssetCollections(with: .album, subtype: .any, options: o).enumerateObjects { c, _, _ in
                 PHAsset.fetchAssets(in: c, options: nil).enumerateObjects { a, _, _ in ids.insert(a.localIdentifier) }
@@ -229,10 +229,10 @@ struct RecentPhotosGrid: View {
         VStack(alignment: .leading, spacing: 8) {
             switch recents.status {
             case .denied, .restricted:
-                Text("No Photos access. Open Settings > Privacy & Security > Photos > Sound Photo Test and choose Full Access (or open Sound Photo once).")
+                Text("No Photos access. Open Settings > Privacy & Security > Photos > Safekeep and choose Full Access (or open Safekeep once).")
                     .font(.footnote).foregroundStyle(.secondary)
             case .notDetermined:
-                Text("Open Sound Photo once to allow Photos access.").font(.footnote).foregroundStyle(.secondary)
+                Text("Open Safekeep once to allow Photos access.").font(.footnote).foregroundStyle(.secondary)
             default:
                 if recents.status == .limited {
                     HStack {

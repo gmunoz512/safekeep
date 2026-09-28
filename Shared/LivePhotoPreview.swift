@@ -72,7 +72,7 @@ struct LivePhotoResultCard: View {
             .frame(height: 260)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             Text(playing ? "Playing…" : "Press and hold the photo to hear it.").font(.subheadline)
-            Text("Live Photo: \(isLive ? "yes" : "checking…") · last play: \(lastPlayed) · album \"Sound Photos\"")
+            Text("Live Photo: \(isLive ? "yes" : "checking…") · last play: \(lastPlayed) · album \"Safekeep\"")
                 .font(.caption2).foregroundStyle(.secondary)
         }
         .padding()

@@ -59,7 +59,7 @@ struct AddSoundView: View {
             guard !started else { return }
             started = true
             recents.log = { [weak model = m] s in model?.say(s) }
-            m.say("=== Sound Photo Test app (debug screen) — build \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "?") — \(Date()) ===")
+            m.say("=== Safekeep app (debug screen) — build \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "?") — \(Date()) ===")
             m.checkClipboard(trigger: "launch")
             await recents.load(reason: "launch")
         }
@@ -146,7 +146,7 @@ struct AddSoundView: View {
             }
             .buttonStyle(.borderedProminent)
             .disabled(m.busy || m.imageData == nil || m.audioURL == nil || m.isRecording)
-            Text("Creates a NEW Live Photo next to the original (original is never changed) and adds it to the \"Sound Photos\" album.")
+            Text("Creates a NEW Live Photo next to the original (original is never changed) and adds it to the \"Safekeep\" album.")
                 .font(.caption2).foregroundStyle(.secondary)
             if let r = m.result {
                 HStack {

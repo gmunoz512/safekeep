@@ -24,10 +24,10 @@ struct SetupView: View {
                         Text("How to use it in Messages").font(.headline)
                         step(1, "square.and.arrow.down", "Save the photo", "In the chat, hold the photo and tap Save.")
                         step(2, "doc.on.doc", "Copy the voice note", "Hold the voice message and tap Copy.")
-                        step(3, "plus.circle", "Open Sound Photo", "Tap + next to the text box, then Sound Photo (it may be under More). Tap Paste, then tap the photo. Done.")
+                        step(3, "plus.circle", "Open Safekeep", "Tap + next to the text box, then Safekeep (it may be under More). Tap Paste, then tap the photo. Done.")
                     }
 
-                    Text("A new Live Photo with the sound is saved next to the original, in the album \"Sound Photos\". The original is never changed. Press and hold it in Photos to hear it.")
+                    Text("A new Live Photo with the sound is saved next to the original, in the album \"Safekeep\". The original is never changed. Press and hold it in Photos to hear it.")
                         .font(.footnote).foregroundStyle(.secondary)
 
                     Text(Self.buildInfo)
@@ -36,7 +36,7 @@ struct SetupView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Sound Photo")
+            .navigationTitle("Safekeep")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
@@ -59,7 +59,7 @@ struct SetupView: View {
     /// Shows which build is installed and whether the iMessage extension is inside it (for troubleshooting the + drawer).
     static var buildInfo: String {
         let info = Bundle.main.infoDictionary ?? [:]
-        var lines = ["Sound Photo \(info["CFBundleShortVersionString"] ?? "?") (build \(info["CFBundleVersion"] ?? "?"))"]
+        var lines = ["Safekeep \(info["CFBundleShortVersionString"] ?? "?") (build \(info["CFBundleVersion"] ?? "?"))"]
         let dir = Bundle.main.builtInPlugInsURL
         let appexes = (dir.flatMap { try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil) } ?? [])
             .filter { $0.pathExtension == "appex" }
@@ -86,7 +86,7 @@ struct SetupView: View {
             }
             switch status {
             case .authorized:
-                Text("All set. You can close this app and use Sound Photo in Messages.").font(.subheadline)
+                Text("All set. You can close this app and use Safekeep in Messages.").font(.subheadline)
             case .notDetermined:
                 Button {
                     Task { status = await PHPhotoLibrary.requestAuthorization(for: .readWrite) }
