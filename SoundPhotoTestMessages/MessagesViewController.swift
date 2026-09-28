@@ -193,9 +193,9 @@ struct ExtensionRootView: View {
                     Label("Add copied voice note", systemImage: "waveform")
                 }
                 .buttonStyle(PeachButtonStyle())
-                Text("Hold the voice note → Copy, then tap here")
+                Text("In the chat, hold the voice note → Copy, then tap here")
                     .font(Theme.rounded(.subheadline, .medium)).foregroundStyle(Theme.cream)
-                Text("Or: Save to Voice Memos → Share → Safekeep")
+                Text("Or: hold the voice note → Save to Voice Memos, then in Voice Memos ••• → Share → Safekeep")
                     .font(Theme.rounded(.caption)).foregroundStyle(Theme.sage)
                 Button { requestExpand(); m.say("Choose audio file tapped"); showDocPicker = true } label: {
                     Label("Choose audio file", systemImage: "folder")

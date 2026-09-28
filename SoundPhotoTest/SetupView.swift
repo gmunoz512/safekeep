@@ -96,7 +96,7 @@ struct SetupView: View {
             Text("Safekeep")
                 .font(Theme.rounded(.largeTitle, .bold))
                 .foregroundStyle(Theme.cream)
-            Text("Add a voice note to a photo, right inside Messages.")
+            Text("Add a voice note to a photo, remember it forever.")
                 .font(Theme.rounded(.title3, .medium))
                 .foregroundStyle(Theme.cream.opacity(0.92))
                 .multilineTextAlignment(.center)
@@ -110,12 +110,45 @@ struct SetupView: View {
 
     private var stepsCard: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("How to use it in Messages")
+            tip
+            optionCard("Option A — Copy", icon: "doc.on.doc", steps: [
+                ("In Messages, hold the voice note → Copy.", nil),
+                ("Tap + → Safekeep → Add copied voice note.", nil),
+                ("Tap the photo. Done.", nil),
+            ])
+            optionCard("Option B — Voice Memos", icon: "waveform", steps: [
+                ("Hold the voice note → Save to Voice Memos.", nil),
+                ("In Voice Memos, open it → ••• → Share → Safekeep.", nil),
+                ("Tap the photo. Done.", nil),
+            ])
+        }
+    }
+
+    private var tip: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "photo.badge.arrow.down")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(Theme.peach)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(Theme.peach.opacity(0.16)))
+            VStack(alignment: .leading, spacing: 2) {
+                Text("First, save the photo").font(Theme.rounded(.subheadline, .semibold)).foregroundStyle(Theme.cream)
+                Text("Save the photo from the chat first: hold it → Save.")
+                    .font(Theme.rounded(.subheadline)).foregroundStyle(Theme.sage)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private func optionCard(_ title: String, icon: String, steps: [(String, String?)]) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label(title, systemImage: icon)
                 .font(Theme.rounded(.headline, .semibold))
                 .foregroundStyle(Theme.cream)
-            step(1, "Save the photo", "In the chat, hold the photo and tap Save.")
-            step(2, "Copy the voice note", "Hold the voice message and tap Copy.")
-            step(3, "Open Safekeep", "Tap + next to the text box, then Safekeep (it may be under More). Tap \"Add copied voice note\", then tap the photo. Done.")
+            ForEach(Array(steps.enumerated()), id: \.offset) { i, st in
+                step(i + 1, st.0, st.1)
+            }
         }
         .themeCard(padding: 20)
     }
@@ -177,17 +210,20 @@ struct SetupView: View {
         .themeCard(padding: 20)
     }
 
-    private func step(_ n: Int, _ title: String, _ detail: String) -> some View {
-        HStack(alignment: .top, spacing: 14) {
+    private func step(_ n: Int, _ title: String, _ detail: String?) -> some View {
+        HStack(alignment: .center, spacing: 14) {
             Text("\(n)")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(Theme.onPeach)
                 .frame(width: 32, height: 32)
                 .background(Circle().fill(Theme.peach))
             VStack(alignment: .leading, spacing: 3) {
-                Text(title).font(Theme.rounded(.subheadline, .semibold)).foregroundStyle(Theme.cream)
-                Text(detail).font(Theme.rounded(.subheadline)).foregroundStyle(Theme.sage)
+                Text(title).font(Theme.rounded(.subheadline, .medium)).foregroundStyle(Theme.cream)
                     .fixedSize(horizontal: false, vertical: true)
+                if let detail {
+                    Text(detail).font(Theme.rounded(.subheadline)).foregroundStyle(Theme.sage)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
