@@ -29,14 +29,37 @@ enum Theme {
 
     static let corner: CGFloat = 22
 
-    /// Deep petrol with a subtle diagonal + radial glow toward card teal.
+    /// Deep petrol with soft lighter-teal diagonal arcs (mockup).
     static var background: some View {
-        ZStack {
-            deepPetrol
-            LinearGradient(colors: [cardTeal.opacity(0.85), deepPetrol.opacity(0)],
-                           startPoint: .topTrailing, endPoint: .bottomLeading)
-            RadialGradient(colors: [cardTeal.opacity(0.9), .clear], center: .init(x: 0.5, y: 0.08),
-                           startRadius: 10, endRadius: 420)
+        GeometryReader { g in
+            let w = g.size.width, h = g.size.height
+            ZStack {
+                deepPetrol
+                LinearGradient(colors: [cardTeal.opacity(0.9), deepPetrol.opacity(0.0), cardTeal.opacity(0.35)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                // Upper-left arc
+                Circle()
+                    .fill(RadialGradient(colors: [secondaryTeal.opacity(0.45), cardTeal.opacity(0.0)],
+                                         center: .center, startRadius: 0, endRadius: w * 0.75))
+                    .frame(width: w * 1.5, height: w * 1.5)
+                    .position(x: -w * 0.15, y: -w * 0.35)
+                Circle()
+                    .stroke(secondaryTeal.opacity(0.25), lineWidth: 1.2)
+                    .frame(width: w * 1.25, height: w * 1.25)
+                    .position(x: -w * 0.2, y: -w * 0.3)
+                // Right-side sweeping arc
+                Circle()
+                    .fill(cardTeal.opacity(0.45))
+                    .frame(width: w * 2.2, height: w * 2.2)
+                    .position(x: w * 1.55, y: h * 0.42)
+                    .blur(radius: 2)
+                Circle()
+                    .stroke(secondaryTeal.opacity(0.22), lineWidth: 1.2)
+                    .frame(width: w * 2.2, height: w * 2.2)
+                    .position(x: w * 1.55, y: h * 0.42)
+            }
+            .frame(width: w, height: h)
+            .clipped()
         }
         .ignoresSafeArea()
     }
@@ -118,7 +141,7 @@ struct PillLabel: View {
     }
 }
 
-/// Ivory hero card: gold circle with an icon, petrol title + subtitle, chevron.
+/// Soft sand hero card with a warm gradient: petrol circle with an ivory icon, petrol text, chevron.
 struct HeroCard: View {
     let title: String
     let subtitle: String
@@ -128,26 +151,30 @@ struct HeroCard: View {
         Button(action: action) {
             HStack(spacing: 16) {
                 Image(systemName: icon)
-                    .font(.system(size: 26, weight: .semibold))
-                    .foregroundStyle(Theme.deepPetrol)
-                    .frame(width: 64, height: 64)
-                    .background(Circle().fill(Theme.mutedGold))
-                    .shadow(color: Theme.mutedGold.opacity(0.35), radius: 8, y: 3)
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(Theme.warmIvory)
+                    .frame(width: 60, height: 60)
+                    .background(Circle().fill(Theme.deepPetrol))
+                    .shadow(color: .black.opacity(0.2), radius: 6, y: 3)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title).font(.system(.title3).weight(.semibold)).foregroundStyle(Theme.deepPetrol)
-                    Text(subtitle).font(.system(.subheadline)).foregroundStyle(Theme.deepPetrol.opacity(0.8))
+                    Text(subtitle).font(.system(.subheadline)).foregroundStyle(Theme.deepPetrol.opacity(0.82))
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.right").font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(Theme.deepPetrol.opacity(0.75))
+                    .foregroundStyle(Theme.deepPetrol.opacity(0.8))
             }
             .padding(18)
             .frame(maxWidth: .infinity)
-            .background(RoundedRectangle(cornerRadius: 24, style: .continuous).fill(Theme.warmIvory))
-            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Theme.softSand, lineWidth: 1))
-            .shadow(color: .black.opacity(0.25), radius: 12, y: 6)
+            .background(
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(LinearGradient(colors: [Color(hex: 0xF3DDB3), Theme.softSand, Color(hex: 0xE2B97E)],
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
+            )
+            .overlay(RoundedRectangle(cornerRadius: 24, style: .continuous).stroke(Theme.warmIvory.opacity(0.55), lineWidth: 1))
+            .shadow(color: .black.opacity(0.28), radius: 14, y: 7)
         }
         .buttonStyle(.plain)
     }
