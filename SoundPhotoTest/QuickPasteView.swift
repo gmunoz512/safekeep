@@ -22,8 +22,8 @@ struct QuickPasteView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if let r = m.result {
-                        savedCard(r)   // arrow hint first, right under the "◀ Messages" breadcrumb
                         header
+                        savedCard(r)
                     } else {
                         header
                         statusCard
@@ -56,9 +56,7 @@ struct QuickPasteView: View {
             scheduleAutoPaste(reason: "scenePhase")
         }
         .onChange(of: m.result) { r in
-            // No auto-open of Messages (sms:/messages:// can land on a blank or new message).
-            // The system "◀ Messages" breadcrumb returns to the exact conversation.
-            if r != nil { m.say("saved → showing Saved card (back via ◀ Messages breadcrumb)") }
+            if r != nil { m.say("saved → showing Saved card") }
         }
     }
 
@@ -174,7 +172,7 @@ struct QuickPasteView: View {
 
     private func savedCard(_ r: SavedAsset) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            backHint
+            savedTitle
             LivePhotoResultCard(item: r, log: { m.say($0) }) { m.result = nil; m.clearSound() }
             Button { openPhotosApp() } label: {
                 Label("See it in Photos", systemImage: "photo.on.rectangle")
@@ -191,21 +189,11 @@ struct QuickPasteView: View {
         }
     }
 
-    /// Points at the system "◀ Messages" breadcrumb (status bar, top left), which returns to the exact chat.
-    private var backHint: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: "arrow.up.left")
-                .font(.system(size: 34, weight: .heavy))
-                .foregroundStyle(Theme.peach)
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Saved ✓").font(Theme.rounded(.largeTitle, .bold)).foregroundStyle(Theme.cream)
-                Text("Tap ◀ Messages at the top left to go back to your chat")
-                    .font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.peach)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.top, 2)
+    private var savedTitle: some View {
+        Label("Saved ✓", systemImage: "checkmark.circle.fill")
+            .font(Theme.rounded(.largeTitle, .bold))
+            .foregroundStyle(Theme.cream)
+            .labelStyle(.titleOnly)
     }
 
     private func openPhotosApp() {
