@@ -17,7 +17,7 @@ struct QuickFlowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            clipboardCard
+            if showPasteControls || !m.pasteStatus.isEmpty { clipboardCard }
             if m.busy { busyRow }
             if m.audioURL != nil { soundReadyRow }
             if let sel = m.selectedForSave, m.audioURL == nil { pendingRow(sel) }

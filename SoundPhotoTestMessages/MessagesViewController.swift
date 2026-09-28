@@ -39,14 +39,11 @@ final class MessagesViewController: MSMessagesAppViewController {
         ])
         h.didMove(toParent: self)
         host = h
-        // Whole panel accepts drops (e.g. the voice note bubble dragged from the chat above).
-        view.addInteraction(UIDropInteraction(delegate: self))
-        model.say("drop interaction installed on the panel")
     }
 
     /// Fallback when the extension can't read the clipboard: the app itself can.
     private func openContainingApp() {
-        guard let url = URL(string: "safekeep://paste") else { return }
+        guard let url = URL(string: "safekeep://paste?from=messages&t=\(Int(Date().timeIntervalSince1970))") else { return }
         model.say("Opening Safekeep app via \(url)…")
         guard let ctx = extensionContext else {
             model.setPasteStatus("Can't open the app: no extension context.", error: true); return
@@ -128,56 +125,8 @@ final class MessagesViewController: MSMessagesAppViewController {
     private func stopTimer() { timer?.invalidate(); timer = nil }
 }
 
-extension MessagesViewController: UIDropInteractionDelegate {
-    private func describe(_ session: UIDropSession) -> String {
-        let parts = session.items.enumerated().map { i, it -> String in
-            let p = it.itemProvider
-            return "item\(i) \(p.registeredTypeIdentifiers) name=\(p.suggestedName ?? "-")"
-        }
-        return "\(session.items.count) item(s): " + parts.joined(separator: "; ")
-    }
-
-    func dropInteraction(_ interaction: UIDropInteraction, canHandle session: UIDropSession) -> Bool {
-        model.say("\n=== Drag entered Safekeep — \(Date()) ===\ncanHandle: " + describe(session))
-        return true   // accept everything so the log shows what Messages offers
-    }
-
-    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnter session: UIDropSession) {
-        ui.dropTargeted = true
-        let types = session.items.flatMap { $0.itemProvider.registeredTypeIdentifiers }
-        model.setPasteStatus("Drag detected: \(session.items.count) item(s), \(types.isEmpty ? "no types" : types.joined(separator: ", ")). Let go to use it.")
-    }
-
-    func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: UIDropSession) -> UIDropProposal {
-        UIDropProposal(operation: .copy)
-    }
-
-    func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: UIDropSession) {
-        ui.dropTargeted = false
-        model.say("drag exited the panel")
-    }
-
-    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: UIDropSession) {
-        ui.dropTargeted = false
-    }
-
-    func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
-        ui.dropTargeted = false
-        let providers = session.items.map(\.itemProvider)
-        let types = providers.flatMap(\.registeredTypeIdentifiers)
-        model.say("performDrop: " + describe(session))
-        model.say(Mem.line("drop"))
-        model.setPasteStatus("Dropped \(providers.count) item(s): \(types.isEmpty ? "no types" : types.joined(separator: ", ")). Loading…")
-        Task { @MainActor in
-            if await model.loadFromProviders(providers, method: "drag & drop") { return }
-            model.setPasteStatus("Dropped \(providers.count) item(s) (\(types.isEmpty ? "no types" : types.joined(separator: ", "))) but no usable audio — see log", error: true)
-        }
-    }
-}
-
 final class ExtUIState: ObservableObject {
     @Published var compact = true
-    @Published var dropTargeted = false
 }
 
 struct ExtensionRootView: View {
@@ -188,6 +137,7 @@ struct ExtensionRootView: View {
     let openApp: () -> Void
     let insertLog: () -> Void
     @State private var showLog = false
+    @State private var showDocPicker = false
 
     var body: some View {
         ZStack {
@@ -196,15 +146,15 @@ struct ExtensionRootView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     header.id("top")
-                    dropZone
                     if let r = m.result {
                         LivePhotoResultCard(item: r, log: { m.say($0) }) { m.result = nil }
                     }
                     if recents.status == .notDetermined || recents.status == .denied || recents.status == .restricted {
                         permissionCard
                     }
-                    QuickFlowView(m: m, recents: recents, columns: 4, onNeedRoom: requestExpand, openApp: openApp)
-                    logSection
+                    addCard
+                    QuickFlowView(m: m, recents: recents, columns: 4, onNeedRoom: requestExpand, showPasteControls: false)
+                    if showLog { logSection }
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 10)
@@ -235,34 +185,52 @@ struct ExtensionRootView: View {
         }
     }
 
-    /// Visual target; the whole panel accepts the drop (UIDropInteraction on the view controller's view).
-    private var dropZone: some View {
-        HStack(spacing: 10) {
-            Image(systemName: ui.dropTargeted ? "arrow.down.circle.fill" : "hand.draw")
-                .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(ui.dropTargeted ? Theme.onPeach : Theme.peach)
-            Text(ui.dropTargeted ? "Let go to use this voice note" : "Or drag the voice note here")
-                .font(Theme.rounded(.subheadline, .semibold))
-                .foregroundStyle(ui.dropTargeted ? Theme.onPeach : Theme.cream)
-            Spacer(minLength: 0)
+    /// Paste and drag are blocked for Messages extensions, so the main action hands off to the app.
+    private var addCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if m.audioURL == nil {
+                Button { openApp() } label: {
+                    Label("Add copied voice note", systemImage: "waveform")
+                }
+                .buttonStyle(PeachButtonStyle())
+                Text("Hold the voice note → Copy, then tap here")
+                    .font(Theme.rounded(.subheadline, .medium)).foregroundStyle(Theme.cream)
+                Text("Or: Save to Voice Memos → Share → Safekeep")
+                    .font(Theme.rounded(.caption)).foregroundStyle(Theme.sage)
+                Button { requestExpand(); m.say("Choose audio file tapped"); showDocPicker = true } label: {
+                    Label("Choose audio file", systemImage: "folder")
+                }
+                .buttonStyle(SoftButtonStyle())
+            }
         }
-        .padding(.vertical, 12).padding(.horizontal, 14)
-        .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .fill(ui.dropTargeted ? Theme.peach : Color.white.opacity(0.04)))
-        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-            .strokeBorder(Theme.peach.opacity(ui.dropTargeted ? 1 : 0.55), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])))
-        .animation(.easeOut(duration: 0.15), value: ui.dropTargeted)
+        .themeCard()
+        .sheet(isPresented: $showDocPicker) {
+            AudioDocPicker(isPresented: $showDocPicker) { url in Task { await m.pickedFile(url) } }
+        }
     }
 
     /// Log is always reachable with plain buttons (no menu).
     private var logSection: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Text("Diagnostics (paste is blocked by iOS inside Messages)")
+                .font(Theme.rounded(.caption, .semibold)).foregroundStyle(Theme.sage)
+            Text([m.clipStatus, m.pasteButtonEnabled.map { $0 ? "Paste button: active" : "Paste button: greyed out" } ?? "", m.pasteStatus]
+                    .filter { !$0.isEmpty }.joined(separator: "\n"))
+                .font(.system(size: 10, design: .monospaced)).foregroundStyle(Theme.sage)
+                .textSelection(.enabled)
+            HStack(spacing: 10) {
+                AudioPasteButton(
+                    onPaste: { providers in Task { await m.pasteFromControl(providers) } },
+                    onTouch: { m.pasteButtonTouched() },
+                    onEnabledChange: { e in m.pasteButtonEnabledChanged(e) }
+                ).frame(width: 150, height: 40)
+                Button("Paste another way") { Task { await m.pasteAudio() } }
+            }
+            .buttonStyle(SoftButtonStyle())
             HStack(spacing: 10) {
                 Button("Copy log (replaces clipboard)") { copyLog() }
                 Button("Put log in message") { insertLog() }
                 Spacer()
-                Button(showLog ? "Hide" : "Show") { showLog.toggle(); if showLog { requestExpand() } }
             }
             .buttonStyle(SoftButtonStyle())
             HStack(spacing: 10) {
@@ -272,7 +240,6 @@ struct ExtensionRootView: View {
                 Button("Clear log", role: .destructive) { m.clearLog() }
             }
             .buttonStyle(SoftButtonStyle())
-            if showLog {
                 ScrollView {
                     Text(m.log)
                         .font(.system(size: 10, design: .monospaced))
@@ -283,7 +250,6 @@ struct ExtensionRootView: View {
                 }
                 .frame(height: 260)
                 .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Color.black.opacity(0.2)))
-            }
         }
     }
 

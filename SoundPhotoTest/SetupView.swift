@@ -7,7 +7,8 @@ struct SetupView: View {
     @State private var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     @State private var showDebug = false
     @State private var showMatrix = false
-    @State private var showQuickPaste = false
+    @EnvironmentObject private var router: AppRouter
+    @State private var clipAudioTypes: [String] = []
 
     var body: some View {
         NavigationStack {
@@ -15,6 +16,7 @@ struct SetupView: View {
                 Theme.background
                 ScrollView {
                     VStack(alignment: .leading, spacing: 28) {
+                        if !clipAudioTypes.isEmpty { pasteCard }
                         header
                         permissionCard
                         stepsCard
@@ -22,7 +24,7 @@ struct SetupView: View {
                             .font(Theme.rounded(.footnote))
                             .foregroundStyle(Theme.sage)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text(Self.buildInfo)
+                        Text(Self.buildInfo + "\nlast link: " + router.lastLink)
                             .font(.system(size: 9, design: .monospaced))
                             .foregroundStyle(Theme.sage.opacity(0.45))
                             .textSelection(.enabled)
@@ -46,17 +48,47 @@ struct SetupView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .navigationDestination(isPresented: $showDebug) { AddSoundView() }
             .navigationDestination(isPresented: $showMatrix) { ContentView().navigationTitle("Test matrix") }
-            .onOpenURL { url in
-                // safekeep://paste — opened from the iMessage extension when it can't read the clipboard.
-                if url.host == "paste" { showQuickPaste = true }
-            }
-            .fullScreenCover(isPresented: $showQuickPaste) { QuickPasteView { showQuickPaste = false } }
             .onChange(of: scenePhase) { p in
-                if p == .active { status = PHPhotoLibrary.authorizationStatus(for: .readWrite) }
+                if p == .active { status = PHPhotoLibrary.authorizationStatus(for: .readWrite); refreshClipboard() }
             }
+            .onAppear { refreshClipboard() }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in refreshClipboard() }
+            .onReceive(NotificationCenter.default.publisher(for: UIPasteboard.changedNotification)) { _ in refreshClipboard() }
         }
         .tint(Theme.peach)
         .preferredColorScheme(.dark)
+    }
+
+    /// Metadata-only check (no paste prompt): does the clipboard hold audio (e.g. a copied voice note)?
+    private func refreshClipboard() {
+        let types = UIPasteboard.general.types.filter(AddSoundModel.isAudioType)
+        if types != clipAudioTypes { clipAudioTypes = types }
+    }
+
+    private var pasteCard: some View {
+        Button { router.openQuickPaste(reason: "setup paste card (\(clipAudioTypes.joined(separator: ", ")))") } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(Theme.peach)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(Theme.onPeach))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Paste voice note").font(Theme.rounded(.title3, .bold))
+                    Text("A voice note is on your clipboard. Tap to add it to a photo.")
+                        .font(Theme.rounded(.subheadline))
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.system(size: 15, weight: .bold))
+            }
+            .foregroundStyle(Theme.onPeach)
+            .padding(18)
+            .frame(maxWidth: .infinity)
+            .background(RoundedRectangle(cornerRadius: 22, style: .continuous).fill(Theme.peach))
+            .shadow(color: .black.opacity(0.25), radius: 10, y: 5)
+        }
+        .buttonStyle(.plain)
     }
 
     private var header: some View {
@@ -88,7 +120,7 @@ struct SetupView: View {
                 .foregroundStyle(Theme.cream)
             step(1, "Save the photo", "In the chat, hold the photo and tap Save.")
             step(2, "Copy the voice note", "Hold the voice message and tap Copy.")
-            step(3, "Open Safekeep", "Tap + next to the text box, then Safekeep (it may be under More). Tap Paste, then tap the photo. Done.")
+            step(3, "Open Safekeep", "Tap + next to the text box, then Safekeep (it may be under More). Tap \"Add copied voice note\", then tap the photo. Done.")
         }
         .themeCard(padding: 20)
     }
