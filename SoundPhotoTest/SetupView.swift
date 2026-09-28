@@ -50,6 +50,10 @@ struct SetupView: View {
             }
             .navigationDestination(isPresented: $showDebug) { AddSoundView() }
             .navigationDestination(isPresented: $showMatrix) { ContentView().navigationTitle("Test matrix") }
+            .onOpenURL { url in
+                // safekeep://paste — opened from the iMessage extension when it can't read the clipboard.
+                if url.host == "paste" { showDebug = true }
+            }
             .onChange(of: scenePhase) { p in
                 if p == .active { status = PHPhotoLibrary.authorizationStatus(for: .readWrite) }
             }

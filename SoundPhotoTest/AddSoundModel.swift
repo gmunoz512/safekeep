@@ -27,6 +27,14 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     /// Set when audio is on the clipboard and that clipboard (changeCount) hasn't been used/dismissed yet.
     @Published var clipboardOffer: Int?
     @Published var clipboardTypesSummary = ""
+    /// Live clipboard status (types only, no prompt), shown in the card.
+    @Published var clipStatus = "Clipboard: not checked yet"
+    /// Result of the last paste tap, shown in the card so no tap is ever silent.
+    @Published var pasteStatus = ""
+    @Published var pasteStatusIsError = false
+    /// Set when a direct read returns nothing at all: the process likely can't see the clipboard.
+    @Published var clipboardUnreadable = false
+    @Published var pasteButtonEnabled: Bool?
     /// Photo tapped in the grid while no sound was ready: saved automatically once the sound arrives.
     @Published var selectedForSave: PHAsset?
     /// Photo waiting for the "Save sound copy" confirmation.
@@ -130,6 +138,9 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             say("[clipboard check · \(trigger) · \(Date().formatted(date: .omitted, time: .standard))] changeCount=\(cc) handled=\(handled.map { String($0) } ?? "none") items=\(pb.numberOfItems) types=\(types) audioTypes=\(audio) contains(audio)=\(containsAudio) voiceMessageMarker=\(voiceMarker) hasStrings=\(pb.hasStrings) hasURLs=\(pb.hasURLs) hasImages=\(pb.hasImages)")
         }
         lastCheckedChangeCount = cc
+        let shown = types.count > 4 ? Array(types.prefix(4)) + ["+\(types.count - 4) more"] : types
+        clipStatus = "Clipboard: #\(cc) · \(pb.numberOfItems) item(s) · \(types.isEmpty ? "no types visible" : shown.joined(separator: ", "))"
+            + (cc == 0 && types.isEmpty ? " (change #0: clipboard looks blocked for Safekeep here)" : "")
         clipboardTypesSummary = audio.first ?? (voiceMarker ? "com.apple.messages.audioMessage" : "")
         if detected && cc != handled {
             if clipboardOffer != cc { say("  → audio detected, showing paste card (changeCount \(cc))") }
@@ -154,39 +165,140 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         say("clipboard changeCount \(cc) marked as used.")
     }
 
+    private var lastTouch = Date.distantPast
+
+    func pasteButtonTouched() {
+        guard Date().timeIntervalSince(lastTouch) > 0.5 else { return }
+        lastTouch = Date()
+        let pb = UIPasteboard.general
+        let enabled = pasteButtonEnabled.map { $0 ? "active" : "greyed out" } ?? "unknown"
+        setPasteStatus("Paste button tapped (\(enabled)); clipboard #\(pb.changeCount), \(pb.numberOfItems) item(s), types \(pb.types.isEmpty ? "none" : pb.types.joined(separator: ", ")). Waiting for iOS to hand over the items…",
+                       error: pasteButtonEnabled == false)
+        let at = lastTouch
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            if self.lastTouch == at && self.pasteStatus.hasPrefix("Paste button tapped") {
+                self.setPasteStatus("iOS delivered nothing to the Paste button (it was \(enabled)). Try \"Paste another way\" or \"Choose audio file\".", error: true)
+            }
+        }
+    }
+
+    func pasteButtonEnabledChanged(_ e: Bool) {
+        guard pasteButtonEnabled != e else { return }
+        pasteButtonEnabled = e
+        say("Paste button is now \(e ? "active" : "greyed out") (clipboard #\(UIPasteboard.general.changeCount))")
+    }
+
+    func setPasteStatus(_ text: String, error: Bool = false) {
+        pasteStatus = text
+        pasteStatusIsError = error
+        say("[status] " + text)
+    }
+
     /// Items handed over by the UIPasteControl (no system prompt).
     func pasteFromControl(_ providers: [NSItemProvider]) async {
         say("\n=== Paste via UIPasteControl — \(Date()) ===")
         say("paste method: UIPasteControl (no prompt), \(providers.count) item provider(s)")
         say(Mem.line())
-        for (i, p) in providers.enumerated() { say("  provider\(i) types: \(p.registeredTypeIdentifiers)") }
-        for p in providers {
-            if let t = p.registeredTypeIdentifiers.first(where: Self.isAudioType) {
-                say("Trying provider file representation for \(t)…")
-                if let url = await Self.loadFile(p, type: t) {
-                    say("Got file from provider: \(url.lastPathComponent)")
-                    markClipboardUsed()
-                    await process(url, source: "paste control (\(t))"); return
+        let types = providers.flatMap(\.registeredTypeIdentifiers)
+        setPasteStatus("Paste button gave \(providers.count) item(s): \(types.isEmpty ? "no types" : types.joined(separator: ", "))", error: providers.isEmpty)
+        guard !providers.isEmpty else { return }
+        if await loadFromProviders(providers, method: "paste button") { return }
+        setPasteStatus("Paste button: items had no usable audio (\(types.joined(separator: ", "))). Try \"Choose audio file\".", error: true)
+    }
+
+    /// Tries every provider: audio types first (data → file → in-place), then public.file-url / public.url.
+    /// Returns true when a sound was loaded and processed.
+    func loadFromProviders(_ providers: [NSItemProvider], method: String) async -> Bool {
+        let preferred = ["com.apple.coreaudio-format", "public.audio"]
+        for (i, p) in providers.enumerated() {
+            let reg = p.registeredTypeIdentifiers
+            say("  provider\(i) types: \(reg)")
+            var candidates: [String] = reg.filter(Self.isAudioType)
+            for t in preferred where !candidates.contains(t) && p.hasItemConformingToTypeIdentifier(t) { candidates.append(t) }
+            for t in candidates {
+                for mode in ["data", "file", "in-place"] {
+                    setPasteStatus("Loading \(t) (\(mode))…")
+                    let (url, note) = await Self.load(p, type: t, mode: mode)
+                    say("  \(t) \(mode): \(note)")
+                    if let url {
+                        markClipboardUsed()
+                        setPasteStatus("Got audio via \(method) (\(t), \(mode)). Converting…")
+                        await process(url, source: "\(method) (\(t), \(mode))")
+                        if audioURL != nil { setPasteStatus("Sound ready: \(String(format: "%.1f", audioDuration)) s — now tap a photo") }
+                        else { setPasteStatus("Got \(t) but conversion failed — see log", error: true) }
+                        return true
+                    }
                 }
-                say("  file representation for \(t) failed")
             }
-        }
-        for p in providers where p.hasItemConformingToTypeIdentifier("public.file-url") {
-            say("Trying public.file-url…")
-            let url: URL? = await withCheckedContinuation { c in
-                _ = p.loadObject(ofClass: URL.self) { u, _ in c.resume(returning: u) }
-            }
-            if let u = url, u.isFileURL {
+            for t in ["public.file-url", "public.url"] where p.hasItemConformingToTypeIdentifier(t) {
+                setPasteStatus("Loading \(t)…")
+                let (u, note) = await Self.loadURLItem(p, type: t)
+                say("  \(t): \(note)")
+                guard let u, u.isFileURL else { continue }
                 let dest = Self.tmp(u.pathExtension.isEmpty ? "audio" : u.pathExtension)
                 let access = u.startAccessingSecurityScopedResource()
                 defer { if access { u.stopAccessingSecurityScopedResource() } }
-                if (try? FileManager.default.copyItem(at: u, to: dest)) != nil {
+                do {
+                    try FileManager.default.copyItem(at: u, to: dest)
                     markClipboardUsed()
-                    await process(dest, source: "paste control (file URL)"); return
+                    await process(dest, source: "\(method) (\(t))")
+                    if audioURL != nil { setPasteStatus("Sound ready: \(String(format: "%.1f", audioDuration)) s — now tap a photo"); return true }
+                } catch {
+                    say("  copy from \(u.path) failed: \(error.localizedDescription)")
+                    setPasteStatus("Can't read the voice note file (\(u.lastPathComponent)): \(error.localizedDescription)", error: true)
                 }
             }
         }
-        say("RESULT: pasted items had no usable audio. Try 'Paste another way'.")
+        return false
+    }
+
+    nonisolated private static func ext(for type: String, url: URL? = nil) -> String {
+        if let e = url?.pathExtension, !e.isEmpty { return e }
+        if type == "com.apple.coreaudio-format" { return "caf" }
+        return UTType(type)?.preferredFilenameExtension ?? "audio"
+    }
+
+    /// One provider load in the given mode. Always returns a human-readable note.
+    nonisolated static func load(_ p: NSItemProvider, type: String, mode: String) async -> (URL?, String) {
+        await withCheckedContinuation { (c: CheckedContinuation<(URL?, String), Never>) in
+            switch mode {
+            case "data":
+                _ = p.loadDataRepresentation(forTypeIdentifier: type) { data, err in
+                    guard let data, !data.isEmpty else { c.resume(returning: (nil, "no data (\(err?.localizedDescription ?? "nil"))")); return }
+                    let dest = tmp(ext(for: type))
+                    do { try data.write(to: dest); c.resume(returning: (dest, "\(data.count) bytes")) }
+                    catch { c.resume(returning: (nil, "write failed: \(error.localizedDescription)")) }
+                }
+            case "file":
+                _ = p.loadFileRepresentation(forTypeIdentifier: type) { url, err in
+                    guard let url else { c.resume(returning: (nil, "no file (\(err?.localizedDescription ?? "nil"))")); return }
+                    let dest = tmp(ext(for: type, url: url))
+                    do { try FileManager.default.copyItem(at: url, to: dest); c.resume(returning: (dest, "file \(url.lastPathComponent)")) }
+                    catch { c.resume(returning: (nil, "copy failed: \(error.localizedDescription)")) }
+                }
+            default:
+                p.loadInPlaceFileRepresentation(forTypeIdentifier: type) { url, inPlace, err in
+                    guard let url else { c.resume(returning: (nil, "no in-place file (\(err?.localizedDescription ?? "nil"))")); return }
+                    let access = url.startAccessingSecurityScopedResource()
+                    defer { if access { url.stopAccessingSecurityScopedResource() } }
+                    let dest = tmp(ext(for: type, url: url))
+                    do { try FileManager.default.copyItem(at: url, to: dest); c.resume(returning: (dest, "in-place=\(inPlace) \(url.lastPathComponent)")) }
+                    catch { c.resume(returning: (nil, "copy failed: \(error.localizedDescription)")) }
+                }
+            }
+        }
+    }
+
+    nonisolated static func loadURLItem(_ p: NSItemProvider, type: String) async -> (URL?, String) {
+        await withCheckedContinuation { (c: CheckedContinuation<(URL?, String), Never>) in
+            p.loadItem(forTypeIdentifier: type, options: nil) { item, err in
+                if let u = item as? URL { c.resume(returning: (u, "URL \(u.absoluteString.prefix(120))")) }
+                else if let d = item as? Data, let u = URL(dataRepresentation: d, relativeTo: nil) { c.resume(returning: (u, "URL(data) \(u.absoluteString.prefix(120))")) }
+                else if let s = item as? String, let u = URL(string: s) { c.resume(returning: (u, "URL(string) \(s.prefix(120))")) }
+                else { c.resume(returning: (nil, "no URL (\(item.map { String(describing: Swift.type(of: $0)) } ?? "nil"), \(err?.localizedDescription ?? "no error"))")) }
+            }
+        }
     }
 
     // MARK: Quick flow: recent photo tapped / chosen
@@ -319,12 +431,20 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // MARK: 2. Sound
 
+    /// Fallback: read the pasteboard directly (may prompt "Allow Paste"). Every step reports into the card.
     func pasteAudio() async {
-        say("\n=== Paste voice message — \(Date()) ===")
+        say("\n=== Paste another way (direct read) — \(Date()) ===")
         say("paste method: direct UIPasteboard read (fallback; may show the system paste prompt)")
         let pb = UIPasteboard.general
-        say("pasteboard: changeCount=\(pb.changeCount) numberOfItems=\(pb.numberOfItems)")
-        say("pasteboard types: \(pb.types)")
+        let cc = pb.changeCount, n = pb.numberOfItems, types = pb.types
+        say("pasteboard: changeCount=\(cc) numberOfItems=\(n) types=\(types) hasStrings=\(pb.hasStrings) hasURLs=\(pb.hasURLs)")
+        setPasteStatus("Reading clipboard: #\(cc), \(n) item(s), types \(types.isEmpty ? "none" : types.joined(separator: ", "))")
+        if n == 0 && types.isEmpty {
+            clipboardUnreadable = true
+            setPasteStatus("Safekeep can't see anything on the clipboard (0 items, change #\(cc)). iOS may not let apps inside Messages read the clipboard. Use \"Choose audio file\" or \"Open Safekeep app\".", error: true)
+            return
+        }
+        clipboardUnreadable = false
         for (i, item) in pb.items.enumerated() {
             for (k, v) in item {
                 let d: String
@@ -335,44 +455,34 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 say("  item\(i) [\(k)]: \(d)")
             }
         }
-        let providers = pb.itemProviders
-        for (i, p) in providers.enumerated() {
-            say("  provider\(i) types: \(p.registeredTypeIdentifiers)")
-        }
-        // 1) item providers with an audio type (best for large files)
-        for p in providers {
-            if let t = p.registeredTypeIdentifiers.first(where: Self.isAudioType) {
-                say("Trying provider file representation for \(t)…")
-                if let url = await Self.loadFile(p, type: t) {
-                    say("Got file from provider: \(url.lastPathComponent)")
-                    markClipboardUsed()
-                    await process(url, source: "paste (\(t))"); return
-                }
-            }
-        }
-        // 2) raw data for any audio type on the pasteboard
-        for t in pb.types where Self.isAudioType(t) {
-            if let data = pb.data(forPasteboardType: t) {
-                let ext = UTType(t)?.preferredFilenameExtension ?? "audio"
-                let url = Self.tmp(ext)
+        if await loadFromProviders(pb.itemProviders, method: "direct read") { return }
+        for t in types where Self.isAudioType(t) {
+            if let data = pb.data(forPasteboardType: t), !data.isEmpty {
+                let url = Self.tmp(Self.ext(for: t))
                 do {
                     try data.write(to: url)
                     say("Wrote \(data.count) bytes of \(t) to \(url.lastPathComponent)")
                     markClipboardUsed()
-                    await process(url, source: "paste data (\(t))"); return
+                    await process(url, source: "paste data (\(t))")
+                    if audioURL != nil { setPasteStatus("Sound ready: \(String(format: "%.1f", audioDuration)) s — now tap a photo"); return }
                 } catch { say("write failed: \(error.localizedDescription)") }
+            } else {
+                say("  data(forPasteboardType: \(t)) returned nothing")
             }
         }
-        // 3) a file URL pointing at audio
-        if let u = pb.url, u.isFileURL {
-            say("Pasteboard has file URL \(u.lastPathComponent)")
+        for u in pb.urls ?? [] where u.isFileURL {
+            say("Pasteboard has file URL \(u.path)")
             let dest = Self.tmp(u.pathExtension.isEmpty ? "audio" : u.pathExtension)
             if (try? FileManager.default.copyItem(at: u, to: dest)) != nil {
                 markClipboardUsed()
-                await process(dest, source: "paste file URL"); return
+                await process(dest, source: "paste file URL")
+                if audioURL != nil { setPasteStatus("Sound ready: \(String(format: "%.1f", audioDuration)) s — now tap a photo"); return }
+            } else {
+                say("  can't copy \(u.path) (no access from this process)")
             }
         }
         say("RESULT: no audio found on the pasteboard.")
+        setPasteStatus("Clipboard has \(n) item(s) (\(types.joined(separator: ", "))) but no readable audio. Try \"Choose audio file\".", error: true)
     }
 
     nonisolated private static func loadFile(_ p: NSItemProvider, type: String) async -> URL? {
@@ -389,14 +499,18 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     func pickedFile(_ url: URL) async {
         say("\n=== Audio file chosen — \(Date()) ===")
+        setPasteStatus("Loading \(url.lastPathComponent)…")
         let dest = Self.tmp(url.pathExtension.isEmpty ? "audio" : url.pathExtension)
         let access = url.startAccessingSecurityScopedResource()
         defer { if access { url.stopAccessingSecurityScopedResource() } }
         do {
             try FileManager.default.copyItem(at: url, to: dest)
             await process(dest, source: "file \(url.lastPathComponent)")
+            if audioURL != nil { setPasteStatus("Sound ready: \(String(format: "%.1f", audioDuration)) s — now tap a photo") }
+            else { setPasteStatus("That file couldn't be used as audio — see log", error: true) }
         } catch {
             say("copy failed: \(error.localizedDescription)")
+            setPasteStatus("Couldn't read \(url.lastPathComponent): \(error.localizedDescription)", error: true)
         }
     }
 

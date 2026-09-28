@@ -8,7 +8,10 @@ struct QuickFlowView: View {
     var columns = 4
     /// Called before anything that needs more room (extension: switch to expanded).
     var onNeedRoom: () -> Void = {}
+    /// Extension only: open the containing app (which can read the clipboard) as a fallback.
+    var openApp: (() -> Void)? = nil
     @State private var presenter = PresenterHolder()
+    @State private var showDocPicker = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -20,36 +23,69 @@ struct QuickFlowView: View {
         }
     }
 
+    private var pasteButton: some View {
+        AudioPasteButton(
+            onPaste: { providers in Task { await m.pasteFromControl(providers) } },
+            onTouch: { m.pasteButtonTouched() },
+            onEnabledChange: { e in m.pasteButtonEnabledChanged(e) }
+        )
+    }
+
     private var clipboardCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if m.clipboardOffer != nil {
-                Label("Voice note copied — tap to use", systemImage: "waveform").font(.headline)
-                AudioPasteButton { providers in
-                    Task { await m.pasteFromControl(providers) }
+            if m.audioURL == nil {
+                if m.clipboardOffer != nil {
+                    Label("Voice note copied — tap to use", systemImage: "waveform").font(.headline)
+                } else {
+                    Text("1. In the chat, hold the voice note → Copy").font(.subheadline)
+                    Text("2. Come back here and tap Paste").font(.subheadline)
                 }
-                .frame(maxWidth: .infinity, minHeight: 52, maxHeight: 52)
-                HStack {
-                    Button("Paste another way") { Task { await m.pasteAudio() } }
+                HStack(spacing: 12) {
+                    pasteButton.frame(width: 210, height: 52)
+                    Button("Paste another way") { onNeedRoom(); Task { await m.pasteAudio() } }.font(.footnote)
+                }
+                HStack(spacing: 16) {
+                    Button { onNeedRoom(); m.say("Choose audio file tapped"); showDocPicker = true } label: {
+                        Label("Choose audio file", systemImage: "folder")
+                    }
+                    if let openApp {
+                        Button { openApp() } label: { Label("Open Safekeep app", systemImage: "arrow.up.forward.app") }
+                    }
                     Spacer()
-                    Button("Not now") { m.dismissClipboardOffer() }
+                    if m.clipboardOffer != nil { Button("Not now") { m.dismissClipboardOffer() } }
                 }
                 .font(.footnote)
-            } else if m.audioURL == nil {
-                Text("1. In the chat, hold the voice note → Copy").font(.subheadline)
-                Text("2. Come back here and tap Paste").font(.subheadline)
-                HStack(spacing: 12) {
-                    AudioPasteButton { providers in
-                        Task { await m.pasteFromControl(providers) }
-                    }
-                    .frame(width: 210, height: 52)
-                    Button("Paste another way") { Task { await m.pasteAudio() } }.font(.footnote)
-                }
             }
+            statusLines
         }
-        .padding(m.clipboardOffer != nil || m.audioURL == nil ? 14 : 0)
+        .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(RoundedRectangle(cornerRadius: 14)
-            .fill(m.clipboardOffer != nil ? Color.accentColor.opacity(0.14) : Color(uiColor: .secondarySystemBackground)))
+            .fill(m.clipboardOffer != nil && m.audioURL == nil ? Color.accentColor.opacity(0.14) : Color(uiColor: .secondarySystemBackground)))
+        .sheet(isPresented: $showDocPicker) {
+            AudioDocPicker(isPresented: $showDocPicker) { url in Task { await m.pickedFile(url) } }
+        }
+        .onAppear { m.checkClipboard(trigger: "card appeared") }
+    }
+
+    /// Always-visible status: live clipboard types, paste button state, and the result of the last tap.
+    private var statusLines: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(m.clipStatus)
+            if let e = m.pasteButtonEnabled, m.audioURL == nil {
+                Text(e ? "Paste button: active" : "Paste button: greyed out (iOS reports no audio on the clipboard for Safekeep)")
+            }
+            if !m.pasteStatus.isEmpty {
+                Text(m.pasteStatus).foregroundStyle(m.pasteStatusIsError ? Color.orange : Color.primary)
+            }
+            if m.clipboardUnreadable && m.audioURL == nil {
+                Text("Safekeep can't read the clipboard from inside Messages on this iPhone. Use \"Choose audio file\"\(openApp != nil ? ", or \"Open Safekeep app\" to paste there" : "").")
+                    .foregroundStyle(Color.orange)
+            }
+        }
+        .font(.caption2.monospaced())
+        .foregroundStyle(.secondary)
+        .textSelection(.enabled)
     }
 
     private var busyRow: some View {
