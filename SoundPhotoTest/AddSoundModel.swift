@@ -485,6 +485,87 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         setPasteStatus("Clipboard has \(n) item(s) (\(types.joined(separator: ", "))) but no readable audio. Try \"Choose audio file\".", error: true)
     }
 
+    /// Exactly build 7's working paste path (app only): item provider with an audio type →
+    /// loadFileRepresentation → process; then raw pasteboard data; then a file URL. No early bail-outs.
+    /// Returns true when a sound is ready.
+    @discardableResult
+    func pasteBuild7(trigger: String) async -> Bool {
+        say("\n=== Paste voice message (build-7 method, \(trigger)) — \(Date()) ===")
+        let pb = UIPasteboard.general
+        say("pasteboard: changeCount=\(pb.changeCount) numberOfItems=\(pb.numberOfItems)")
+        let types = pb.types
+        say("pasteboard types: \(types)")
+        let typeList = types.isEmpty ? "none" : types.joined(separator: ", ")
+        setPasteStatus("Reading clipboard… (#\(pb.changeCount), \(pb.numberOfItems) item(s): \(typeList))")
+        let readItems = pb.items   // the actual read (may show iOS's "Allow Paste" prompt)
+        say("items actually read: \(readItems.count)")
+        for (i, item) in readItems.enumerated() {
+            for (k, v) in item {
+                let d: String
+                if let data = v as? Data { d = "Data \(data.count) bytes" }
+                else if let s = v as? String { d = "String \"\(s.prefix(120))\"" }
+                else if let u = v as? URL { d = "URL \(u)" }
+                else { d = String(describing: type(of: v)) }
+                say("  item\(i) [\(k)]: \(d)")
+            }
+        }
+        let providers = pb.itemProviders
+        for (i, p) in providers.enumerated() { say("  provider\(i) types: \(p.registeredTypeIdentifiers)") }
+        // 1) item providers with an audio type (build 7: this is what worked for com.apple.coreaudio-format)
+        for p in providers {
+            if let t = p.registeredTypeIdentifiers.first(where: Self.isAudioType) {
+                say("Trying provider file representation for \(t)…")
+                setPasteStatus("Loading voice note (\(t))…")
+                if let url = await Self.loadFile(p, type: t) {
+                    say("Got file from provider: \(url.lastPathComponent)")
+                    await process(url, source: "paste (\(t))")
+                    return finishPaste(typeList)
+                } else {
+                    say("  provider file representation for \(t) returned nothing")
+                }
+            }
+        }
+        // 2) raw data for any audio type on the pasteboard
+        for t in types where Self.isAudioType(t) {
+            if let data = pb.data(forPasteboardType: t) {
+                let url = Self.tmp(Self.ext(for: t))
+                do {
+                    try data.write(to: url)
+                    say("Wrote \(data.count) bytes of \(t) to \(url.lastPathComponent)")
+                    await process(url, source: "paste data (\(t))")
+                    return finishPaste(typeList)
+                } catch { say("write failed: \(error.localizedDescription)") }
+            }
+        }
+        // 3) a file URL pointing at audio
+        if let u = pb.url, u.isFileURL {
+            say("Pasteboard has file URL \(u.lastPathComponent)")
+            let dest = Self.tmp(u.pathExtension.isEmpty ? "audio" : u.pathExtension)
+            if (try? FileManager.default.copyItem(at: u, to: dest)) != nil {
+                await process(dest, source: "paste file URL")
+                return finishPaste(typeList)
+            }
+        }
+        say("RESULT: no audio found on the pasteboard.")
+        if pb.numberOfItems > 0 && readItems.isEmpty {
+            setPasteStatus("iOS didn't hand over the clipboard (\(pb.numberOfItems) item(s): \(typeList)) — was the paste prompt answered \"Don't Allow\"? Settings > Apps > Safekeep > Paste from Other Apps > Allow.", error: true)
+        } else if pb.numberOfItems == 0 {
+            setPasteStatus("Clipboard is empty (0 items, #\(pb.changeCount)). In Messages, hold the voice note → Copy, then tap Paste voice note.", error: true)
+        } else {
+            setPasteStatus("No voice note on the clipboard. It has: \(typeList). Copy the voice note again, then tap Paste voice note.", error: true)
+        }
+        return false
+    }
+
+    private func finishPaste(_ typeList: String) -> Bool {
+        if audioURL != nil {
+            setPasteStatus("Voice note ready: \(String(format: "%.1f", audioDuration)) s")
+            return true
+        }
+        setPasteStatus("Got audio from the clipboard (\(typeList)) but it couldn't be converted — see log", error: true)
+        return false
+    }
+
     nonisolated private static func loadFile(_ p: NSItemProvider, type: String) async -> URL? {
         await withCheckedContinuation { (c: CheckedContinuation<URL?, Never>) in
             p.loadFileRepresentation(forTypeIdentifier: type) { url, _ in
@@ -717,6 +798,18 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             pair = p
             for n in notes { say("  \(n)") }
             say("  built still \(Self.fileSize(p.stillURL)) + movie \(Self.fileSize(p.movieURL)) (\(String(format: "%.2f", p.duration)) s)")
+            let mv = AVURLAsset(url: p.movieURL)
+            let at = (try? await mv.loadTracks(withMediaType: .audio)) ?? []
+            let vt = (try? await mv.loadTracks(withMediaType: .video)) ?? []
+            let md = (try? await mv.load(.duration)).map(CMTimeGetSeconds) ?? 0
+            var atDur = 0.0
+            if let t = at.first, let r = try? await t.load(.timeRange) { atDur = CMTimeGetSeconds(r.duration) }
+            say("  movie check: audio tracks=\(at.count) (audio \(String(format: "%.2f", atDur)) s), video tracks=\(vt.count), movie \(String(format: "%.2f", md)) s")
+            if at.isEmpty || atDur <= 0 {
+                say("  ABORT: the Live Photo movie has no audio — not saving.")
+                setPasteStatus("Not saved: the built movie had no audio track — see log", error: true)
+                return nil
+            }
         } catch {
             say("BUILD FAILED (\(Self.bucket(duration))): \(error.localizedDescription)")
             return nil
@@ -761,6 +854,8 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         say("isLive: \(a.mediaSubtypes.contains(.photoLive) ? "YES" : "NO")  size: \(a.pixelWidth)x\(a.pixelHeight)")
         say("creationDate: \(a.creationDate.map(df.string(from:)) ?? "nil")  location: \(a.location.map { "\($0.coordinate.latitude),\($0.coordinate.longitude)" } ?? "nil")")
         say(Mem.line("after save"))
+        let res = PHAssetResource.assetResources(for: a)
+        say("pairedVideo (sound movie) in saved asset: \(res.contains { $0.type == .pairedVideo } ? "YES" : "NO")")
         say("resources: \(PHAssetResource.assetResources(for: a).map { "\($0.type.rawValue):\($0.originalFilename)" }.joined(separator: ", "))")
         if let album {
             let o = PHFetchOptions(); o.predicate = NSPredicate(format: "localIdentifier == %@", newID)

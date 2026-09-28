@@ -259,7 +259,7 @@ struct ExtensionRootView: View {
     private var logSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
-                Button("Copy log") { copyLog() }
+                Button("Copy log (replaces clipboard)") { copyLog() }
                 Button("Put log in message") { insertLog() }
                 Spacer()
                 Button(showLog ? "Hide" : "Show") { showLog.toggle(); if showLog { requestExpand() } }
