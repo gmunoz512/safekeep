@@ -121,6 +121,30 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             2>&1 | tee logs/export-upload.log
 
+      - name: Diagnostics - dump archived and exported bundles (app + appex)
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p logs
+          ci/dump_bundle.sh build/SoundPhotoTest.xcarchive/Products/Applications/SoundPhotoTest.app > logs/bundle-archive.txt 2>&1
+          xcodebuild -exportArchive \
+            -archivePath build/SoundPhotoTest.xcarchive \
+            -exportOptionsPlist ci/ExportOptions-diag.plist \
+            -exportPath build/export-diag \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" > logs/export-diag.log 2>&1 || echo "diag export failed"
+          IPA=$(ls build/export-diag/*.ipa 2>/dev/null | head -1)
+          if [ -n "$IPA" ]; then
+            mkdir -p build/ipa && (cd build/ipa && unzip -q "$GITHUB_WORKSPACE/$IPA")
+            ci/dump_bundle.sh build/ipa/Payload/*.app > logs/bundle-ipa.txt 2>&1
+            cp "$IPA" logs/ 2>/dev/null || true
+          fi
+          cat logs/bundle-archive.txt
+          echo; echo "================ EXPORTED IPA ================"
+          cat logs/bundle-ipa.txt 2>/dev/null || tail -30 logs/export-diag.log
+
       - name: Collect logs
         if: always()
         run: |
