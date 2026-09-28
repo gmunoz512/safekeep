@@ -7,6 +7,7 @@ struct SetupView: View {
     @State private var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
     @State private var showDebug = false
     @State private var showMatrix = false
+    @State private var showQuickPaste = false
 
     var body: some View {
         NavigationStack {
@@ -47,8 +48,9 @@ struct SetupView: View {
             .navigationDestination(isPresented: $showMatrix) { ContentView().navigationTitle("Test matrix") }
             .onOpenURL { url in
                 // safekeep://paste — opened from the iMessage extension when it can't read the clipboard.
-                if url.host == "paste" { showDebug = true }
+                if url.host == "paste" { showQuickPaste = true }
             }
+            .fullScreenCover(isPresented: $showQuickPaste) { QuickPasteView { showQuickPaste = false } }
             .onChange(of: scenePhase) { p in
                 if p == .active { status = PHPhotoLibrary.authorizationStatus(for: .readWrite) }
             }

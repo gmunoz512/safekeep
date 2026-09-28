@@ -40,6 +40,20 @@
 		B1000000000000000000F002 /* Pickers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* Pickers.swift */; };
 		B1000000000000000000F003 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000F003 /* Theme.swift */; };
 		B1000000000000000000F004 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000F003 /* Theme.swift */; };
+		C10000000000000000005001 /* SharedTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000001 /* SharedTypes.swift */; };
+		C10000000000000000005002 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2000000000000000000F003 /* Theme.swift */; };
+		C10000000000000000005003 /* RecentPhotos.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* RecentPhotos.swift */; };
+		C10000000000000000005004 /* PasteControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000003 /* PasteControl.swift */; };
+		C10000000000000000005005 /* LivePhotoPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000004 /* LivePhotoPreview.swift */; };
+		C10000000000000000005006 /* QuickFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000005 /* QuickFlowView.swift */; };
+		C10000000000000000005007 /* ObjCCatch.m in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000006 /* ObjCCatch.m */; };
+		C10000000000000000005008 /* Pickers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000D /* Pickers.swift */; };
+		C10000000000000000005009 /* AddSoundModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2000000000000000000000C /* AddSoundModel.swift */; };
+		C10000000000000000005010 /* LivePhotoBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000004 /* LivePhotoBuilder.swift */; };
+		C10000000000000000005011 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000005001 /* ShareViewController.swift */; };
+		C10000000000000000005050 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C20000000000000000005003 /* Assets.xcassets */; };
+		C10000000000000000005051 /* SoundPhotoTestShare.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = C20000000000000000005004 /* SoundPhotoTestShare.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		C10000000000000000005052 /* QuickPasteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000000000000000005005 /* QuickPasteView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,6 +63,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = B5000000000000000000000F;
 			remoteInfo = SoundPhotoTestMessages;
+		};
+		CA000000000000000000005A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A70000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C5000000000000000000005A;
+			remoteInfo = SoundPhotoTestShare;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -60,6 +81,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				B1000000000000000000002A /* SoundPhotoTestMessages.appex in Embed Foundation Extensions */,
+				C10000000000000000005051 /* SoundPhotoTestShare.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -94,6 +116,11 @@
 		B2000000000000000000000C /* SoundPhotoTestMessages.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SoundPhotoTestMessages.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B2000000000000000000F001 /* MainInterface.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = MainInterface.storyboard; sourceTree = "<group>"; };
 		B2000000000000000000F003 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		C20000000000000000005001 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		C20000000000000000005002 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C20000000000000000005003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C20000000000000000005004 /* SoundPhotoTestShare.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = SoundPhotoTestShare.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		C20000000000000000005005 /* QuickPasteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickPasteView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +138,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C3000000000000000000005A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -120,6 +154,7 @@
 				A40000000000000000000002 /* SoundPhotoTest */,
 				B4000000000000000000000D /* Shared */,
 				B4000000000000000000000E /* SoundPhotoTestMessages */,
+				C4000000000000000000005A /* SoundPhotoTestShare */,
 				A40000000000000000000004 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -136,6 +171,7 @@
 				A2000000000000000000000C /* AddSoundModel.swift */,
 				A2000000000000000000000B /* AddSoundView.swift */,
 				B20000000000000000000008 /* SetupView.swift */,
+				C20000000000000000005005 /* QuickPasteView.swift */,
 				A20000000000000000000007 /* Assets.xcassets */,
 				A20000000000000000000008 /* Info.plist */,
 				A40000000000000000000003 /* Resources */,
@@ -157,6 +193,7 @@
 			children = (
 				A20000000000000000000009 /* SoundPhotoTest.app */,
 				B2000000000000000000000C /* SoundPhotoTestMessages.appex */,
+				C20000000000000000005004 /* SoundPhotoTestShare.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -187,6 +224,16 @@
 			path = SoundPhotoTestMessages;
 			sourceTree = "<group>";
 		};
+		C4000000000000000000005A /* SoundPhotoTestShare */ = {
+			isa = PBXGroup;
+			children = (
+				C20000000000000000005001 /* ShareViewController.swift */,
+				C20000000000000000005003 /* Assets.xcassets */,
+				C20000000000000000005002 /* Info.plist */,
+			);
+			path = SoundPhotoTestShare;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -203,6 +250,7 @@
 			);
 			dependencies = (
 				BB0000000000000000000015 /* PBXTargetDependency */,
+				CB000000000000000000005A /* PBXTargetDependency */,
 			);
 			name = SoundPhotoTest;
 			productName = SoundPhotoTest;
@@ -226,6 +274,23 @@
 			productReference = B2000000000000000000000C /* SoundPhotoTestMessages.appex */;
 			productType = "com.apple.product-type.app-extension.messages";
 		};
+		C5000000000000000000005A /* SoundPhotoTestShare */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C8000000000000000000005A /* Build configuration list for PBXNativeTarget "SoundPhotoTestShare" */;
+			buildPhases = (
+				C6000000000000000000005A /* Sources */,
+				C3000000000000000000005A /* Frameworks */,
+				C6000000000000000000005B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SoundPhotoTestShare;
+			productName = SoundPhotoTestShare;
+			productReference = C20000000000000000005004 /* SoundPhotoTestShare.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -240,6 +305,9 @@
 						CreatedOnToolsVersion = 15.0;
 					};
 					B5000000000000000000000F = {
+						CreatedOnToolsVersion = 15.0;
+					};
+					C5000000000000000000005A = {
 						CreatedOnToolsVersion = 15.0;
 					};
 				};
@@ -259,6 +327,7 @@
 			targets = (
 				A50000000000000000000001 /* SoundPhotoTest */,
 				B5000000000000000000000F /* SoundPhotoTestMessages */,
+				C5000000000000000000005A /* SoundPhotoTestShare */,
 			);
 		};
 /* End PBXProject section */
@@ -280,6 +349,14 @@
 			files = (
 				B10000000000000000000027 /* Assets.xcassets in Resources */,
 				B1000000000000000000F001 /* MainInterface.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C6000000000000000000005B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000000000000000005050 /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -306,6 +383,7 @@
 				B1000000000000000000001D /* QuickFlowView.swift in Sources */,
 				B1000000000000000000001E /* ObjCCatch.m in Sources */,
 				B1000000000000000000001F /* SetupView.swift in Sources */,
+				C10000000000000000005052 /* QuickPasteView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -327,6 +405,24 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C6000000000000000000005A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C10000000000000000005001 /* SharedTypes.swift in Sources */,
+				C10000000000000000005002 /* Theme.swift in Sources */,
+				C10000000000000000005003 /* RecentPhotos.swift in Sources */,
+				C10000000000000000005004 /* PasteControl.swift in Sources */,
+				C10000000000000000005005 /* LivePhotoPreview.swift in Sources */,
+				C10000000000000000005006 /* QuickFlowView.swift in Sources */,
+				C10000000000000000005007 /* ObjCCatch.m in Sources */,
+				C10000000000000000005008 /* Pickers.swift in Sources */,
+				C10000000000000000005009 /* AddSoundModel.swift in Sources */,
+				C10000000000000000005010 /* LivePhotoBuilder.swift in Sources */,
+				C10000000000000000005011 /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -334,6 +430,11 @@
 			isa = PBXTargetDependency;
 			target = B5000000000000000000000F /* SoundPhotoTestMessages */;
 			targetProxy = BA0000000000000000000014 /* PBXContainerItemProxy */;
+		};
+		CB000000000000000000005A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C5000000000000000000005A /* SoundPhotoTestShare */;
+			targetProxy = CA000000000000000000005A /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -497,6 +598,64 @@
 			};
 			name = Release;
 		};
+		C9000000000000000000005A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = W8YUDW42LL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SoundPhotoTestShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gmunoz.soundphototest.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Shared/ObjCCatch.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		C9000000000000000000005B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = W8YUDW42LL;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = SoundPhotoTestShare/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.gmunoz.soundphototest.share;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "Shared/ObjCCatch.h";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -523,6 +682,15 @@
 			buildConfigurations = (
 				B90000000000000000000017 /* Debug */,
 				B90000000000000000000018 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C8000000000000000000005A /* Build configuration list for PBXNativeTarget "SoundPhotoTestShare" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C9000000000000000000005A /* Debug */,
+				C9000000000000000000005B /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

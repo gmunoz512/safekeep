@@ -10,6 +10,8 @@ struct QuickFlowView: View {
     var onNeedRoom: () -> Void = {}
     /// Extension only: open the containing app (which can read the clipboard) as a fallback.
     var openApp: (() -> Void)? = nil
+    /// Share extension: the sound arrives from the share sheet, so no paste/clipboard controls.
+    var showPasteControls = true
     @State private var presenter = PresenterHolder()
     @State private var showDocPicker = false
 
@@ -33,7 +35,7 @@ struct QuickFlowView: View {
 
     private var clipboardCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if m.audioURL == nil {
+            if m.audioURL == nil && showPasteControls {
                 if m.clipboardOffer != nil {
                     Label("Voice note copied — tap to use", systemImage: "waveform")
                         .font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.cream)
@@ -72,7 +74,7 @@ struct QuickFlowView: View {
         .sheet(isPresented: $showDocPicker) {
             AudioDocPicker(isPresented: $showDocPicker) { url in Task { await m.pickedFile(url) } }
         }
-        .onAppear { m.checkClipboard(trigger: "card appeared") }
+        .onAppear { if showPasteControls { m.checkClipboard(trigger: "card appeared") } }
     }
 
     private func numbered(_ n: Int, _ text: String) -> some View {
@@ -89,14 +91,14 @@ struct QuickFlowView: View {
     /// Always-visible status: live clipboard types, paste button state, and the result of the last tap.
     private var statusLines: some View {
         VStack(alignment: .leading, spacing: 3) {
-            Text(m.clipStatus)
-            if let e = m.pasteButtonEnabled, m.audioURL == nil {
+            if showPasteControls { Text(m.clipStatus) }
+            if let e = m.pasteButtonEnabled, m.audioURL == nil, showPasteControls {
                 Text(e ? "Paste button: active" : "Paste button: greyed out (iOS reports no audio on the clipboard for Safekeep)")
             }
             if !m.pasteStatus.isEmpty {
                 Text(m.pasteStatus).foregroundStyle(m.pasteStatusIsError ? Theme.warning : Theme.cream)
             }
-            if m.clipboardUnreadable && m.audioURL == nil {
+            if m.clipboardUnreadable && m.audioURL == nil && showPasteControls {
                 Text("Safekeep can't read the clipboard from inside Messages on this iPhone. Use \"Choose audio file\"\(openApp != nil ? ", or \"Open Safekeep\" to paste there" : "").")
                     .foregroundStyle(Theme.warning)
             }

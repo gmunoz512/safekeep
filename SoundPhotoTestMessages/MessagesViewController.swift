@@ -39,6 +39,9 @@ final class MessagesViewController: MSMessagesAppViewController {
         ])
         h.didMove(toParent: self)
         host = h
+        // Whole panel accepts drops (e.g. the voice note bubble dragged from the chat above).
+        view.addInteraction(UIDropInteraction(delegate: self))
+        model.say("drop interaction installed on the panel")
     }
 
     /// Fallback when the extension can't read the clipboard: the app itself can.
@@ -125,8 +128,56 @@ final class MessagesViewController: MSMessagesAppViewController {
     private func stopTimer() { timer?.invalidate(); timer = nil }
 }
 
+extension MessagesViewController: UIDropInteractionDelegate {
+    private func describe(_ session: UIDropSession) -> String {
+        let parts = session.items.enumerated().map { i, it -> String in
+            let p = it.itemProvider
+            return "item\(i) \(p.registeredTypeIdentifiers) name=\(p.suggestedName ?? "-")"
+        }
+        return "\(session.items.count) item(s): " + parts.joined(separator: "; ")
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, canHandle session: UIDropSession) -> Bool {
+        model.say("\n=== Drag entered Safekeep — \(Date()) ===\ncanHandle: " + describe(session))
+        return true   // accept everything so the log shows what Messages offers
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnter session: UIDropSession) {
+        ui.dropTargeted = true
+        let types = session.items.flatMap { $0.itemProvider.registeredTypeIdentifiers }
+        model.setPasteStatus("Drag detected: \(session.items.count) item(s), \(types.isEmpty ? "no types" : types.joined(separator: ", ")). Let go to use it.")
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidUpdate session: UIDropSession) -> UIDropProposal {
+        UIDropProposal(operation: .copy)
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidExit session: UIDropSession) {
+        ui.dropTargeted = false
+        model.say("drag exited the panel")
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, sessionDidEnd session: UIDropSession) {
+        ui.dropTargeted = false
+    }
+
+    func dropInteraction(_ interaction: UIDropInteraction, performDrop session: UIDropSession) {
+        ui.dropTargeted = false
+        let providers = session.items.map(\.itemProvider)
+        let types = providers.flatMap(\.registeredTypeIdentifiers)
+        model.say("performDrop: " + describe(session))
+        model.say(Mem.line("drop"))
+        model.setPasteStatus("Dropped \(providers.count) item(s): \(types.isEmpty ? "no types" : types.joined(separator: ", ")). Loading…")
+        Task { @MainActor in
+            if await model.loadFromProviders(providers, method: "drag & drop") { return }
+            model.setPasteStatus("Dropped \(providers.count) item(s) (\(types.isEmpty ? "no types" : types.joined(separator: ", "))) but no usable audio — see log", error: true)
+        }
+    }
+}
+
 final class ExtUIState: ObservableObject {
     @Published var compact = true
+    @Published var dropTargeted = false
 }
 
 struct ExtensionRootView: View {
@@ -145,6 +196,7 @@ struct ExtensionRootView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     header.id("top")
+                    dropZone
                     if let r = m.result {
                         LivePhotoResultCard(item: r, log: { m.say($0) }) { m.result = nil }
                     }
@@ -181,6 +233,26 @@ struct ExtensionRootView: View {
             }
             .buttonStyle(SoftButtonStyle())
         }
+    }
+
+    /// Visual target; the whole panel accepts the drop (UIDropInteraction on the view controller's view).
+    private var dropZone: some View {
+        HStack(spacing: 10) {
+            Image(systemName: ui.dropTargeted ? "arrow.down.circle.fill" : "hand.draw")
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(ui.dropTargeted ? Theme.onPeach : Theme.peach)
+            Text(ui.dropTargeted ? "Let go to use this voice note" : "Or drag the voice note here")
+                .font(Theme.rounded(.subheadline, .semibold))
+                .foregroundStyle(ui.dropTargeted ? Theme.onPeach : Theme.cream)
+            Spacer(minLength: 0)
+        }
+        .padding(.vertical, 12).padding(.horizontal, 14)
+        .frame(maxWidth: .infinity)
+        .background(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .fill(ui.dropTargeted ? Theme.peach : Color.white.opacity(0.04)))
+        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .strokeBorder(Theme.peach.opacity(ui.dropTargeted ? 1 : 0.55), style: StrokeStyle(lineWidth: 1.5, dash: [6, 4])))
+        .animation(.easeOut(duration: 0.15), value: ui.dropTargeted)
     }
 
     /// Log is always reachable with plain buttons (no menu).
