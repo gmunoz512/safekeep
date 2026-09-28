@@ -1,49 +1,91 @@
+import Photos
 import SwiftUI
 
+/// Debug / full-control screen (the everyday flow lives in the iMessage extension).
 struct AddSoundView: View {
     @StateObject private var m = AddSoundModel()
+    @StateObject private var recents = RecentPhotosModel()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showPhotoPicker = false
     @State private var showDocPicker = false
     @State private var viewing: SavedAsset?
+    @State private var started = false
+    @State private var showMatrix = false
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    photoSection
-                    Divider()
-                    soundSection
-                    Divider()
-                    saveSection
-                    Divider()
-                    longSection
-                    Divider()
-                    logSection
-                }
-                .padding()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                QuickFlowView(m: m, recents: recents)
+                Divider()
+                Text("More options").font(.headline)
+                secondaryButtons
+                photoSection
+                soundSection
+                saveSection
+                Divider()
+                longSection
+                Divider()
+                LogPanel(m: m)
             }
-            .navigationTitle("Add Sound to Photo")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink("Test matrix") { ContentView().navigationTitle("Test matrix") }
+            .padding()
+        }
+        .navigationTitle("Add Sound (debug)")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Menu {
+                    Button("Test matrix") { showMatrix = true }
+                    Button("Run long-audio check") { Task { await m.longAudioCheck() } }
+                    Button("Reload recent photos") { Task { await recents.load(reason: "manual") } }
+                    Button("Check clipboard") { m.checkClipboard(trigger: "manual") }
+                    Button("Copy log") { UIPasteboard.general.string = m.log }
+                    Button("Clear log", role: .destructive) { m.clearLog() }
+                } label: { Image(systemName: "ellipsis.circle") }
+            }
+        }
+        .navigationDestination(isPresented: $showMatrix) { ContentView().navigationTitle("Test matrix") }
+        .sheet(item: $viewing) { LivePhotoDetail(item: $0) }
+        .sheet(isPresented: Binding(get: { m.confirmAsset != nil }, set: { if !$0 { m.confirmAsset = nil } })) {
+            if let a = m.confirmAsset {
+                ConfirmSaveSheet(asset: a, duration: m.audioDuration, manager: recents.caching,
+                                 onSave: { Task { await m.saveWith(a) } },
+                                 onCancel: { m.confirmAsset = nil })
+                    .presentationDetents([.height(260)])
+            }
+        }
+        .onChange(of: m.result) { r in if let r { viewing = r } }
+        .onChange(of: scenePhase) { p in if p == .active { m.checkClipboard(trigger: "scenePhase active") } }
+        .task {
+            guard !started else { return }
+            started = true
+            recents.log = { [weak model = m] s in model?.say(s) }
+            m.say("=== Sound Photo Test app (debug screen) — build \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "?") — \(Date()) ===")
+            m.checkClipboard(trigger: "launch")
+            await recents.load(reason: "launch")
+        }
+    }
+
+    private var secondaryButtons: some View {
+        HStack {
+            Button { showPhotoPicker = true } label: {
+                Label("Choose from library", systemImage: "photo").frame(maxWidth: .infinity).padding(.vertical, 6)
+            }
+            .buttonStyle(.bordered)
+            .disabled(m.busy)
+            .sheet(isPresented: $showPhotoPicker) {
+                PhotoPicker(isPresented: $showPhotoPicker) { id in
+                    guard let id, let a = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else {
+                        Task { await m.picked(id) }; return
+                    }
+                    m.tapPhoto(a, source: "PHPicker")
                 }
             }
-            .sheet(item: $viewing) { LivePhotoDetail(item: $0) }
         }
     }
 
     private var photoSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("1. Photo").font(.headline)
-            Button { showPhotoPicker = true } label: {
-                Label(m.photoAsset == nil ? "Choose photo" : "Choose another photo", systemImage: "photo")
-                    .frame(maxWidth: .infinity).padding(.vertical, 6)
-            }
-            .buttonStyle(.bordered)
-            .disabled(m.busy)
-            .sheet(isPresented: $showPhotoPicker) {
-                PhotoPicker(isPresented: $showPhotoPicker) { id in Task { await m.picked(id) } }
-            }
+            Text("Current photo").font(.subheadline.bold())
             if let t = m.thumbnail {
                 HStack(alignment: .top) {
                     Image(uiImage: t).resizable().scaledToFit().frame(height: 140)
@@ -65,12 +107,7 @@ struct AddSoundView: View {
 
     private var soundSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("2. Sound").font(.headline)
-            Button { Task { await m.pasteAudio() } } label: {
-                Label("Paste voice message", systemImage: "doc.on.clipboard")
-                    .frame(maxWidth: .infinity).padding(.vertical, 6)
-            }
-            .buttonStyle(.bordered)
+            Text("Sound").font(.subheadline.bold())
             HStack {
                 Button { showDocPicker = true } label: {
                     Label("Choose audio file", systemImage: "folder").frame(maxWidth: .infinity).padding(.vertical, 6)
@@ -101,7 +138,7 @@ struct AddSoundView: View {
 
     private var saveSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("3. Save").font(.headline)
+            Text("Manual save").font(.subheadline.bold())
             Button {
                 Task { if let r = await m.saveSoundCopy() { viewing = r } }
             } label: {
@@ -139,21 +176,6 @@ struct AddSoundView: View {
                 Button("Delete long-audio test photos", role: .destructive) { Task { await m.deleteLongResults() } }
                     .font(.footnote)
             }
-        }
-    }
-
-    private var logSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Button("Copy log") { UIPasteboard.general.string = m.log }
-                Spacer()
-                Button("Clear") { m.log = "" }
-            }
-            .font(.footnote)
-            Text(m.log)
-                .font(.system(.caption2, design: .monospaced))
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
         }
     }
 }

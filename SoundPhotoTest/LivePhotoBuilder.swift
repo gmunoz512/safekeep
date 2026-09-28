@@ -79,7 +79,8 @@ enum LivePhotoBuilder {
 
     static func writeMovie(image: CGImage, audio: AVURLAsset, duration: CMTime,
                            to url: URL, identifier: String,
-                           includeStillImageTime: Bool, creationDate: Date = Date()) async throws {
+                           includeStillImageTime: Bool, creationDate: Date = Date(),
+                           maxSide: Int = 1920) async throws {
         try? FileManager.default.removeItem(at: url)
         let writer = try AVAssetWriter(outputURL: url, fileType: .mov)
 
@@ -98,8 +99,9 @@ enum LivePhotoBuilder {
         writer.metadata = [idItem, dateItem]
 
         // Video: same frame for the whole duration
-        // Longest side 1920, even dimensions, same aspect as the (already upright) frame.
-        let scale = 1920.0 / Double(max(image.width, image.height))
+        // Longest side maxSide (1920 in the app, 1440 in the iMessage extension), even dimensions,
+        // same aspect as the (already upright) frame. One pixel buffer is reused for every frame.
+        let scale = Double(maxSide) / Double(max(image.width, image.height))
         let width = max(2, Int((Double(image.width) * scale / 2).rounded()) * 2)
         let height = max(2, Int((Double(image.height) * scale / 2).rounded()) * 2)
         let videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: [
@@ -228,7 +230,7 @@ enum LivePhotoBuilder {
     /// Builds a Live Photo pair from a user's ORIGINAL image data (metadata preserved, MakerApple 17 replaced)
     /// and an AAC audio file (full length). Returns the pair and human-readable notes.
     static func buildFromOriginal(imageData: Data, audioURL: URL, identifier: String,
-                                  creationDate: Date) async throws -> (LivePhotoPair, [String]) {
+                                  creationDate: Date, maxMovieSide: Int = 1920) async throws -> (LivePhotoPair, [String]) {
         var notes: [String] = []
         guard let src = CGImageSourceCreateWithData(imageData as CFData, nil),
               CGImageSourceGetCount(src) > 0 else { throw TestError("Could not read the photo data.") }
@@ -254,9 +256,11 @@ enum LivePhotoBuilder {
 
         func writeOut(_ p: [String: Any]) -> Bool {
             let outType = (heic ? UTType.heic : UTType.jpeg).identifier as CFString
-            guard let out = CGImageDestinationCreateWithURL(stillURL as CFURL, outType, 1, nil) else { return false }
-            CGImageDestinationAddImageFromSource(out, src, 0, p as CFDictionary)
-            return CGImageDestinationFinalize(out)
+            return autoreleasepool {
+                guard let out = CGImageDestinationCreateWithURL(stillURL as CFURL, outType, 1, nil) else { return false }
+                CGImageDestinationAddImageFromSource(out, src, 0, p as CFDictionary)
+                return CGImageDestinationFinalize(out)
+            }
         }
         func written17() -> String? {
             guard let s2 = CGImageSourceCreateWithURL(stillURL as CFURL, nil),
@@ -281,17 +285,21 @@ enum LivePhotoBuilder {
         let thumbOpts: [CFString: Any] = [
             kCGImageSourceCreateThumbnailFromImageAlways: true,
             kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: 1920,
+            kCGImageSourceThumbnailMaxPixelSize: maxMovieSide,
+            kCGImageSourceShouldCacheImmediately: true,
         ]
         guard let frame = CGImageSourceCreateThumbnailAtIndex(src, 0, thumbOpts as CFDictionary) else {
             throw TestError("Could not render movie frame.")
         }
-        notes.append("movie frame: \(frame.width)x\(frame.height) (upright)")
+        notes.append("movie frame: \(frame.width)x\(frame.height) (upright, max side \(maxMovieSide))")
+        notes.append(Mem.line("after still + frame"))
 
         let audio = AVURLAsset(url: audioURL)
         let duration = try await audio.load(.duration)
         try await writeMovie(image: frame, audio: audio, duration: duration, to: movieURL,
-                             identifier: identifier, includeStillImageTime: true, creationDate: creationDate)
+                             identifier: identifier, includeStillImageTime: true, creationDate: creationDate,
+                             maxSide: maxMovieSide)
+        notes.append(Mem.line("after movie"))
         let pair = LivePhotoPair(stillURL: stillURL, movieURL: movieURL, duration: duration.seconds, identifier: identifier)
         notes.append(contentsOf: try await verify(pair))
         return (pair, notes)

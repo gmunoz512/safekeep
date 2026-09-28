@@ -3,7 +3,7 @@
 Reads the .p8 contents from env ASC_API_KEY_P8 (never printed)."""
 import os, sys, time, json, urllib.request, urllib.error, jwt
 KEY_ID, ISSUER = os.environ.get("ASC_KEY_ID","2JLG54NH47"), "b816f285-1d7a-4f76-b6a9-c7cfa01d579a"
-BUNDLE = "com.gmunoz.soundphototest"
+BUNDLE = os.environ.get("ASC_BUNDLE", "com.gmunoz.soundphototest")
 p8 = os.environ.get("ASC_API_KEY_P8")
 if not p8: sys.exit("ASC_API_KEY_P8 not set")
 now = int(time.time())
@@ -21,7 +21,7 @@ ids = [d for d in b.get("data", []) if d["attributes"]["identifier"] == BUNDLE]
 if ids: print("bundleId exists:", ids[0]["id"])
 else:
     s, b = api("POST", "/v1/bundleIds", {"data": {"type": "bundleIds", "attributes":
-        {"identifier": BUNDLE, "name": "SoundPhotoTest", "platform": "IOS"}}})
+        {"identifier": BUNDLE, "name": os.environ.get("ASC_BUNDLE_NAME", "SoundPhotoTest"), "platform": "IOS"}}})
     print("register bundleId:", s, b.get("data", {}).get("id") or b.get("errors"))
 s, b = api("GET", f"/v1/apps?filter[bundleId]={BUNDLE}")
 apps = b.get("data", [])

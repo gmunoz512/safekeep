@@ -13,14 +13,6 @@ struct TestVariant {
     var heicStill = false
 }
 
-/// A saved test asset, persisted across launches so it can be found, re-checked, played, and deleted.
-struct SavedAsset: Codable, Identifiable, Hashable {
-    let code: String
-    let title: String
-    let localIdentifier: String
-    let savedAt: Date
-    var id: String { localIdentifier }
-}
 
 struct VariantResult {
     let variant: TestVariant
@@ -361,12 +353,3 @@ final class TestRunner: ObservableObject {
         }
     }
 }
-
-struct TestError: LocalizedError {
-    let message: String
-    init(_ m: String) { message = m }
-    var errorDescription: String? { message }
-}
-
-/// Reference box so PhotoKit change blocks can hand back placeholder ids.
-final class IDHolder: @unchecked Sendable { var value: String? }

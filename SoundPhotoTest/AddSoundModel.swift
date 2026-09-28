@@ -23,6 +23,24 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published var result: SavedAsset?
     @Published var longResults: [SavedAsset] = []
 
+    // Quick flow (clipboard card + recent photos + one-tap save)
+    /// Set when audio is on the clipboard and that clipboard (changeCount) hasn't been used/dismissed yet.
+    @Published var clipboardOffer: Int?
+    @Published var clipboardTypesSummary = ""
+    /// Photo tapped in the grid while no sound was ready: saved automatically once the sound arrives.
+    @Published var selectedForSave: PHAsset?
+    /// Photo waiting for the "Save sound copy" confirmation.
+    @Published var confirmAsset: PHAsset?
+
+    /// "[ext] " in the iMessage extension.
+    var logPrefix = ""
+    /// Longest side of the Live Photo movie frame (smaller in the extension to stay under its memory limit).
+    var movieMaxSide = 1920
+    /// App (debug screen): show a confirm sheet. Extension: tap photo = save.
+    var confirmBeforeSave = true
+    private var lastCheckedChangeCount = -1
+    private var loadTask: Task<Void, Never>?
+
     private var recorder: AVAudioRecorder?
     private var recordURL: URL?
     private var player: AVAudioPlayer?
@@ -37,21 +55,205 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         "com.apple.protected-mpeg-4-audio",
     ]
 
-    func say(_ s: String) { log += s + "\n"; print(s) }
+    func say(_ s: String) {
+        let line = logPrefix.isEmpty ? s : s.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.isEmpty ? "" : logPrefix + $0 }.joined(separator: "\n")
+        log += line + "\n"
+        print(line)
+        Self.appendToLogFile(line + "\n")
+    }
+
+    /// Also written to a file in this process's Documents folder (app and extension each keep their own).
+    nonisolated static var logFileURL: URL {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return docs.appendingPathComponent("SoundPhotoLog.txt")
+    }
+
+    nonisolated private static func appendToLogFile(_ s: String) {
+        guard let data = s.data(using: .utf8) else { return }
+        let url = logFileURL
+        if let h = try? FileHandle(forWritingTo: url) {
+            h.seekToEndOfFile(); h.write(data); try? h.close()
+        } else {
+            try? data.write(to: url)
+        }
+    }
+
+    func clearLog() {
+        log = ""
+        try? FileManager.default.removeItem(at: Self.logFileURL)
+    }
 
     nonisolated private static func tmp(_ ext: String) -> URL {
         FileManager.default.temporaryDirectory.appendingPathComponent("audio-\(UUID().uuidString).\(ext)")
     }
 
-    nonisolated private static func isAudioType(_ id: String) -> Bool {
+    /// Types the UIPasteControl accepts (Messages voice notes are com.apple.coreaudio-format).
+    nonisolated static let pasteTypeIdentifiers = knownAudioTypes + ["public.aac-audio", "com.apple.messages.audioMessage"]
+
+    nonisolated static func isAudioType(_ id: String) -> Bool {
         if knownAudioTypes.contains(id) { return true }
         return UTType(id)?.conforms(to: .audio) ?? false
+    }
+
+    // MARK: 0. Clipboard detection (no paste prompt: only types / changeCount / has* are read)
+
+    private static let handledKey = "handledClipboard.v1"
+
+    /// Boot time rounded to a minute, so a stored changeCount is only trusted within the same boot.
+    private static var bootStamp: Int { Int((Date().timeIntervalSince1970 - ProcessInfo.processInfo.systemUptime) / 60) }
+
+    private var handledChangeCount: Int? {
+        get {
+            guard let d = UserDefaults.standard.dictionary(forKey: Self.handledKey),
+                  let cc = d["cc"] as? Int, let boot = d["boot"] as? Int, abs(boot - Self.bootStamp) <= 1 else { return nil }
+            return cc
+        }
+        set {
+            if let newValue { UserDefaults.standard.set(["cc": newValue, "boot": Self.bootStamp], forKey: Self.handledKey) }
+            else { UserDefaults.standard.removeObject(forKey: Self.handledKey) }
+        }
+    }
+
+    func checkClipboard(trigger: String) {
+        let pb = UIPasteboard.general
+        let cc = pb.changeCount
+        let types = pb.types                       // metadata only: does not trigger the paste prompt
+        let audio = types.filter(Self.isAudioType)
+        let containsAudio = pb.contains(pasteboardTypes: Self.knownAudioTypes)
+        let voiceMarker = types.contains("com.apple.messages.audioMessage")
+        let handled = handledChangeCount
+        let detected = !audio.isEmpty || containsAudio || voiceMarker
+        let changed = cc != lastCheckedChangeCount
+        if changed || trigger == "launch" {
+            say("[clipboard check · \(trigger) · \(Date().formatted(date: .omitted, time: .standard))] changeCount=\(cc) handled=\(handled.map { String($0) } ?? "none") items=\(pb.numberOfItems) types=\(types) audioTypes=\(audio) contains(audio)=\(containsAudio) voiceMessageMarker=\(voiceMarker) hasStrings=\(pb.hasStrings) hasURLs=\(pb.hasURLs) hasImages=\(pb.hasImages)")
+        }
+        lastCheckedChangeCount = cc
+        clipboardTypesSummary = audio.first ?? (voiceMarker ? "com.apple.messages.audioMessage" : "")
+        if detected && cc != handled {
+            if clipboardOffer != cc { say("  → audio detected, showing paste card (changeCount \(cc))") }
+            clipboardOffer = cc
+        } else {
+            if clipboardOffer != nil { say("  → hiding paste card (\(detected ? "clipboard already used" : "no audio on clipboard"))") }
+            clipboardOffer = nil
+        }
+    }
+
+    func dismissClipboardOffer() {
+        let cc = UIPasteboard.general.changeCount
+        handledChangeCount = cc
+        clipboardOffer = nil
+        say("Paste card dismissed (changeCount \(cc) won't be offered again).")
+    }
+
+    private func markClipboardUsed() {
+        let cc = UIPasteboard.general.changeCount
+        handledChangeCount = cc
+        clipboardOffer = nil
+        say("clipboard changeCount \(cc) marked as used.")
+    }
+
+    /// Items handed over by the UIPasteControl (no system prompt).
+    func pasteFromControl(_ providers: [NSItemProvider]) async {
+        say("\n=== Paste via UIPasteControl — \(Date()) ===")
+        say("paste method: UIPasteControl (no prompt), \(providers.count) item provider(s)")
+        say(Mem.line())
+        for (i, p) in providers.enumerated() { say("  provider\(i) types: \(p.registeredTypeIdentifiers)") }
+        for p in providers {
+            if let t = p.registeredTypeIdentifiers.first(where: Self.isAudioType) {
+                say("Trying provider file representation for \(t)…")
+                if let url = await Self.loadFile(p, type: t) {
+                    say("Got file from provider: \(url.lastPathComponent)")
+                    markClipboardUsed()
+                    await process(url, source: "paste control (\(t))"); return
+                }
+                say("  file representation for \(t) failed")
+            }
+        }
+        for p in providers where p.hasItemConformingToTypeIdentifier("public.file-url") {
+            say("Trying public.file-url…")
+            let url: URL? = await withCheckedContinuation { c in
+                _ = p.loadObject(ofClass: URL.self) { u, _ in c.resume(returning: u) }
+            }
+            if let u = url, u.isFileURL {
+                let dest = Self.tmp(u.pathExtension.isEmpty ? "audio" : u.pathExtension)
+                let access = u.startAccessingSecurityScopedResource()
+                defer { if access { u.stopAccessingSecurityScopedResource() } }
+                if (try? FileManager.default.copyItem(at: u, to: dest)) != nil {
+                    markClipboardUsed()
+                    await process(dest, source: "paste control (file URL)"); return
+                }
+            }
+        }
+        say("RESULT: pasted items had no usable audio. Try 'Paste another way'.")
+    }
+
+    // MARK: Quick flow: recent photo tapped / chosen
+
+    func tapPhoto(_ asset: PHAsset, source: String) {
+        say("\n=== Photo tapped (\(source)) — \(asset.localIdentifier) ===")
+        if audioURL != nil {
+            if confirmBeforeSave {
+                say("sound is ready → confirm sheet")
+                confirmAsset = asset
+            } else {
+                say("sound is ready → saving right away (no confirm step)")
+                Task { await self.saveWith(asset) }
+                return
+            }
+        } else {
+            say("no sound yet → photo selected; it will be saved as soon as a sound arrives")
+            selectedForSave = asset
+        }
+        // Preload full-resolution data now so the save is quick.
+        if photoAsset?.localIdentifier != asset.localIdentifier || imageData == nil {
+            let id = asset.localIdentifier
+            loadTask = Task { await self.picked(id) }
+        }
+    }
+
+    func cancelSelection() {
+        if selectedForSave != nil { say("Photo selection cleared.") }
+        selectedForSave = nil
+    }
+
+    /// Runs the existing save for the given photo (loading its data first if needed).
+    @discardableResult
+    func saveWith(_ asset: PHAsset) async -> SavedAsset? {
+        confirmAsset = nil
+        selectedForSave = nil
+        say("One-tap save for \(asset.localIdentifier)")
+        await loadTask?.value
+        loadTask = nil
+        if photoAsset?.localIdentifier != asset.localIdentifier || imageData == nil {
+            await picked(asset.localIdentifier)
+        }
+        guard photoAsset?.localIdentifier == asset.localIdentifier, imageData != nil else {
+            say("Photo data not available; not saved."); return nil
+        }
+        return await saveSoundCopy()
+    }
+
+    private func soundArrived() {
+        guard let a = selectedForSave else { return }
+        say("Sound arrived with a photo already selected → saving now")
+        Task { await self.saveWith(a) }
+    }
+
+    func clearSound() {
+        stopPlayback()
+        audioURL = nil
+        audioDuration = 0
+        audioInfo = ""
+        say("Sound cleared.")
     }
 
     // MARK: 1. Photo
 
     func picked(_ assetID: String?) async {
         say("\n=== Photo chosen — \(Date()) ===")
+        say(Mem.line("before photo load"))
         guard let assetID else {
             say("Picker returned no asset identifier (shouldn't happen with the shared library)."); return
         }
@@ -110,6 +312,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
            let p = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [String: Any] {
             let exif = p[kCGImagePropertyExifDictionary as String] as? [String: Any]
             let maker = p[kCGImagePropertyMakerAppleDictionary as String] as? [String: Any]
+            say(Mem.line("after photo load"))
             say("image source: type=\(CGImageSourceGetType(src) as String? ?? "?") \(p[kCGImagePropertyPixelWidth as String] ?? "?")x\(p[kCGImagePropertyPixelHeight as String] ?? "?") DateTimeOriginal=\(exif?[kCGImagePropertyExifDateTimeOriginal as String] ?? "none") GPS=\(p[kCGImagePropertyGPSDictionary as String] != nil) MakerApple17=\(maker?["17"] ?? "none")")
         }
     }
@@ -118,6 +321,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     func pasteAudio() async {
         say("\n=== Paste voice message — \(Date()) ===")
+        say("paste method: direct UIPasteboard read (fallback; may show the system paste prompt)")
         let pb = UIPasteboard.general
         say("pasteboard: changeCount=\(pb.changeCount) numberOfItems=\(pb.numberOfItems)")
         say("pasteboard types: \(pb.types)")
@@ -141,6 +345,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 say("Trying provider file representation for \(t)…")
                 if let url = await Self.loadFile(p, type: t) {
                     say("Got file from provider: \(url.lastPathComponent)")
+                    markClipboardUsed()
                     await process(url, source: "paste (\(t))"); return
                 }
             }
@@ -153,6 +358,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
                 do {
                     try data.write(to: url)
                     say("Wrote \(data.count) bytes of \(t) to \(url.lastPathComponent)")
+                    markClipboardUsed()
                     await process(url, source: "paste data (\(t))"); return
                 } catch { say("write failed: \(error.localizedDescription)") }
             }
@@ -162,13 +368,14 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             say("Pasteboard has file URL \(u.lastPathComponent)")
             let dest = Self.tmp(u.pathExtension.isEmpty ? "audio" : u.pathExtension)
             if (try? FileManager.default.copyItem(at: u, to: dest)) != nil {
+                markClipboardUsed()
                 await process(dest, source: "paste file URL"); return
             }
         }
         say("RESULT: no audio found on the pasteboard.")
     }
 
-    private static func loadFile(_ p: NSItemProvider, type: String) async -> URL? {
+    nonisolated private static func loadFile(_ p: NSItemProvider, type: String) async -> URL? {
         await withCheckedContinuation { (c: CheckedContinuation<URL?, Never>) in
             p.loadFileRepresentation(forTypeIdentifier: type) { url, _ in
                 guard let url else { c.resume(returning: nil); return }
@@ -253,6 +460,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         audioDuration = info.duration
         audioInfo = "\(source) · \(info.format) · \(String(format: "%.1f", info.duration)) s"
         say("Sound ready: \(String(format: "%.2f", info.duration)) s (\(Self.bucket(info.duration)))")
+        soundArrived()
     }
 
     struct AudioInfo { var playable = false; var tracks = 0; var format = "?"; var detail = ""; var isAAC = false; var duration = 0.0 }
@@ -368,6 +576,8 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         defer { busy = false }
         stopPlayback()
         say("\n=== Save sound copy — \(Date()) ===")
+        say("photo: \(asset.localIdentifier)  sound: \(audio.lastPathComponent) \(String(format: "%.2f", audioDuration)) s  movie max side: \(movieMaxSide)")
+        say(Mem.line("before build"))
         let baseDate = asset.creationDate ?? Date()
         let newDate = baseDate.addingTimeInterval(1)
         let loc = asset.location
@@ -388,7 +598,8 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         let pair: LivePhotoPair
         do {
             let (p, notes) = try await LivePhotoBuilder.buildFromOriginal(imageData: imageData, audioURL: audioURL,
-                                                                         identifier: id, creationDate: creationDate)
+                                                                         identifier: id, creationDate: creationDate,
+                                                                         maxMovieSide: movieMaxSide)
             pair = p
             for n in notes { say("  \(n)") }
             say("  built still \(Self.fileSize(p.stillURL)) + movie \(Self.fileSize(p.movieURL)) (\(String(format: "%.2f", p.duration)) s)")
@@ -435,6 +646,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         say("new localIdentifier: \(newID)")
         say("isLive: \(a.mediaSubtypes.contains(.photoLive) ? "YES" : "NO")  size: \(a.pixelWidth)x\(a.pixelHeight)")
         say("creationDate: \(a.creationDate.map(df.string(from:)) ?? "nil")  location: \(a.location.map { "\($0.coordinate.latitude),\($0.coordinate.longitude)" } ?? "nil")")
+        say(Mem.line("after save"))
         say("resources: \(PHAssetResource.assetResources(for: a).map { "\($0.type.rawValue):\($0.originalFilename)" }.joined(separator: ", "))")
         if let album {
             let o = PHFetchOptions(); o.predicate = NSPredicate(format: "localIdentifier == %@", newID)
