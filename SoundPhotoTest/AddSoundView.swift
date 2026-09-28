@@ -11,6 +11,7 @@ struct AddSoundView: View {
     @State private var viewing: SavedAsset?
     @State private var started = false
     @State private var showMatrix = false
+    @EnvironmentObject private var router: AppRouter
 
     var body: some View {
         ScrollView {
@@ -26,6 +27,12 @@ struct AddSoundView: View {
                 longSection
                 Divider()
                 LogPanel(m: m)
+                Divider()
+                Text("Build info").font(.headline)
+                Text(SetupView.buildInfo + "\nlast link: " + router.lastLink)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(Theme.sage)
+                    .textSelection(.enabled)
             }
             .padding()
         }

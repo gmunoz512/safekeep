@@ -24,11 +24,6 @@ struct SetupView: View {
                             .font(Theme.rounded(.footnote))
                             .foregroundStyle(Theme.sage)
                             .fixedSize(horizontal: false, vertical: true)
-                        Text(Self.buildInfo + "\nlast link: " + router.lastLink)
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(Theme.sage.opacity(0.45))
-                            .textSelection(.enabled)
-                            .padding(.top, 12)
                     }
                     .padding(.horizontal, 22)
                     .padding(.vertical, 16)
@@ -132,11 +127,12 @@ struct SetupView: View {
         let dir = Bundle.main.builtInPlugInsURL
         let appexes = (dir.flatMap { try? FileManager.default.contentsOfDirectory(at: $0, includingPropertiesForKeys: nil) } ?? [])
             .filter { $0.pathExtension == "appex" }
-        if appexes.isEmpty { lines.append("iMessage extension: NOT FOUND in this install") }
+        if appexes.isEmpty { lines.append("Extensions: NOT FOUND in this install") }
         for u in appexes {
             let b = Bundle(url: u)
             let ext = b?.infoDictionary?["NSExtension"] as? [String: Any]
-            lines.append("iMessage extension: \(u.lastPathComponent) · \(b?.bundleIdentifier ?? "?") · \(ext?["NSExtensionPointIdentifier"] ?? "?") · build \(b?.infoDictionary?["CFBundleVersion"] ?? "?")")
+            let kind = u.lastPathComponent.contains("Share") ? "Share extension" : "iMessage extension"
+            lines.append("\(kind): \(u.lastPathComponent) · \(b?.bundleIdentifier ?? "?") · \(ext?["NSExtensionPointIdentifier"] ?? "?") · build \(b?.infoDictionary?["CFBundleVersion"] ?? "?")")
         }
         return lines.joined(separator: "\n")
     }
