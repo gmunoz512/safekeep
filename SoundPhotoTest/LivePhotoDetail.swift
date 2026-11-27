@@ -49,12 +49,7 @@ struct LivePhotoDetail: View {
     }
 
     private func load() async {
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            info += "Audio session error: \(error.localizedDescription)\n"
-        }
+        LivePhotoAudio.activatePlaybackSession()
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [item.localIdentifier], options: nil).firstObject else {
             status = "Asset not found in library (deleted, or no Photos access)."
             return

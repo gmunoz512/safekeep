@@ -268,7 +268,8 @@ struct SavedPhotoViewer: View {
                     .disabled(preparingShare)
                 }
                 .padding(.horizontal, 16).padding(.top, 8)
-                Spacer()
+                // Don't steal press-and-hold from the Live Photo underneath.
+                Spacer().allowsHitTesting(false)
                 Text(playing ? "Playing…" : "Press and hold the photo to hear it")
                     .font(Theme.rounded(.subheadline, .medium))
                     .foregroundStyle(Theme.cream)
@@ -283,8 +284,7 @@ struct SavedPhotoViewer: View {
     }
 
     private func load() async {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-        try? AVAudioSession.sharedInstance().setActive(true)
+        LivePhotoAudio.activatePlaybackSession()
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [item.localIdentifier], options: nil).firstObject else {
             status = "Saved photo not found."; log("viewer: asset not found"); return
         }

@@ -1,7 +1,51 @@
 import AVFoundation
+import UIKit
 import Photos
 import PhotosUI
 import SwiftUI
+
+/// Activates a playback session that is not silenced by the Ring/Silent switch.
+/// PHLivePhotoView will otherwise follow the default session (silenced when the switch is on),
+/// which matches "Playing…" with no sound.
+enum LivePhotoAudio {
+    static func activatePlaybackSession() {
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playback, mode: .moviePlayback)
+            try session.setActive(true)
+        } catch {
+            // Changing category can fail if a session is already active; drop it and retry.
+            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            try? session.setCategory(.playback, mode: .moviePlayback)
+            try? session.setActive(true)
+        }
+    }
+
+    /// Press-and-hold must beat the enclosing SwiftUI ScrollView, which otherwise
+    /// delays/cancels the gesture and leaves only the muted "hint" animation.
+    static func allowPressAndHold(in view: UIView) {
+        var current: UIView? = view.superview
+        while let c = current {
+            if let scroll = c as? UIScrollView {
+                scroll.canCancelContentTouches = false
+                scroll.delaysContentTouches = false
+                return
+            }
+            current = c.superview
+        }
+    }
+}
+
+/// PHLivePhotoView that keeps audio on and prepares the session as soon as it is on screen.
+final class UnmutedLivePhotoView: PHLivePhotoView {
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        guard window != nil else { return }
+        isMuted = false
+        LivePhotoAudio.allowPressAndHold(in: self)
+        LivePhotoAudio.activatePlaybackSession()
+    }
+}
 
 struct LivePhotoViewRep: UIViewRepresentable {
     let livePhoto: PHLivePhoto
@@ -11,7 +55,7 @@ struct LivePhotoViewRep: UIViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeUIView(context: Context) -> PHLivePhotoView {
-        let v = PHLivePhotoView()
+        let v = UnmutedLivePhotoView()
         v.contentMode = .scaleAspectFit
         v.isMuted = false
         v.delegate = context.coordinator
@@ -30,8 +74,12 @@ struct LivePhotoViewRep: UIViewRepresentable {
         init(_ p: LivePhotoViewRep) { parent = p }
 
         func livePhotoView(_ livePhotoView: PHLivePhotoView, willBeginPlaybackWith playbackStyle: PHLivePhotoViewPlaybackStyle) {
+            LivePhotoAudio.activatePlaybackSession()
+            livePhotoView.isMuted = false
             start = Date()
-            parent.playing = true
+            // Hint playback is a short bounce and is typically muted. Only full
+            // (press-and-hold) playback should show "Playing…".
+            parent.playing = (playbackStyle == .full)
         }
 
         func livePhotoView(_ livePhotoView: PHLivePhotoView, didEndPlaybackWith playbackStyle: PHLivePhotoViewPlaybackStyle) {
@@ -80,8 +128,7 @@ struct LivePhotoResultCard: View {
     }
 
     private func load() async {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
-        try? AVAudioSession.sharedInstance().setActive(true)
+        LivePhotoAudio.activatePlaybackSession()
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [item.localIdentifier], options: nil).firstObject else {
             status = "Saved asset not found."; log("result: asset not found \(item.localIdentifier)"); return
         }
