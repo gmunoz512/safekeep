@@ -192,28 +192,110 @@ struct PhotoThumb: View {
     let asset: PHAsset
     let manager: PHCachingImageManager
     @State private var image: UIImage?
+    @State private var session = ThumbSession()
 
     var body: some View {
         Theme.card
             .aspectRatio(1, contentMode: .fit)
             .overlay {
                 if let image {
-                    Image(uiImage: image).resizable().scaledToFill()
+                    // Fill is clipped to the square. Hit testing is disabled so a
+                    // landscape photo can't spill taps into the neighboring cell.
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                        .clipped()
+                        .allowsHitTesting(false)
                 }
             }
             .clipped()
-            .onAppear(perform: request)
+            .contentShape(Rectangle())
+            .task(id: asset.localIdentifier) {
+                // Invalidate any in-flight request for a previous asset. The
+                // session is a class so stale PhotoKit callbacks see the change
+                // even if they captured an old View struct.
+                session.assetID = nil
+                image = nil
+                let expectedID = asset.localIdentifier
+                let next = ThumbSession()
+                next.assetID = expectedID
+                session = next
+                await loadThumb(expectedID: expectedID, session: next)
+            }
     }
 
-    private func request() {
-        guard image == nil else { return }
-        let o = PHImageRequestOptions()
-        o.deliveryMode = .opportunistic
-        o.resizeMode = .fast
-        o.isNetworkAccessAllowed = true
-        manager.requestImage(for: asset, targetSize: RecentPhotosModel.thumbPixels, contentMode: .aspectFill, options: o) { img, _ in
-            if let img { DispatchQueue.main.async { image = img } }
+    @MainActor
+    private func loadThumb(expectedID: String, session: ThumbSession) async {
+        let opts = PHImageRequestOptions()
+        opts.deliveryMode = .opportunistic
+        opts.resizeMode = .fast
+        opts.isNetworkAccessAllowed = true
+        let manager = self.manager
+        let asset = self.asset
+        let token = ThumbRequestToken()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { (cont: CheckedContinuation<Void, Never>) in
+                token.attach(cont)
+                token.requestID = manager.requestImage(
+                    for: asset,
+                    targetSize: RecentPhotosModel.thumbPixels,
+                    contentMode: .aspectFill,
+                    options: opts
+                ) { img, info in
+                    let cancelled = (info?[PHImageCancelledKey] as? Bool) ?? false
+                    if !cancelled, let img {
+                        DispatchQueue.main.async {
+                            // Drop stale callbacks from a previous asset or a cancelled request.
+                            guard session.assetID == expectedID else { return }
+                            image = img
+                        }
+                    }
+                    let degraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                    if cancelled || !degraded || info?[PHImageErrorKey] != nil {
+                        token.finish()
+                    }
+                }
+            }
+        } onCancel: {
+            session.assetID = nil
+            if let id = token.requestID { manager.cancelImageRequest(id) }
+            token.finish()
         }
+    }
+}
+
+/// Lets a later request invalidate in-flight PhotoKit callbacks (reference type, not a copied View).
+private final class ThumbSession: @unchecked Sendable {
+    var assetID: String?
+}
+
+/// Completes a continuation at most once. PhotoKit callbacks may arrive off the main thread.
+private final class ThumbRequestToken: @unchecked Sendable {
+    var requestID: PHImageRequestID?
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var done = false
+
+    func attach(_ cont: CheckedContinuation<Void, Never>) {
+        lock.lock()
+        if done {
+            lock.unlock()
+            cont.resume()
+            return
+        }
+        continuation = cont
+        lock.unlock()
+    }
+
+    func finish() {
+        lock.lock()
+        guard !done else { lock.unlock(); return }
+        done = true
+        let c = continuation
+        continuation = nil
+        lock.unlock()
+        c?.resume()
     }
 }
 
@@ -255,18 +337,29 @@ struct RecentPhotosGrid: View {
                 }
                 LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: columns), spacing: 6) {
                     ForEach(recents.assets, id: \.localIdentifier) { a in
-                        Button { onTap(a) } label: {
+                        let id = a.localIdentifier
+                        Button {
+                            // Resolve by stable id so a library refresh between
+                            // render and tap cannot hand us a different photo.
+                            if let asset = recents.assets.first(where: { $0.localIdentifier == id })
+                                ?? PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject {
+                                onTap(asset)
+                            }
+                        } label: {
                             PhotoThumb(asset: a, manager: recents.caching)
                                 .overlay {
-                                    if a.localIdentifier == selectedID {
+                                    if id == selectedID {
                                         RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Theme.peach, lineWidth: 4)
                                         Image(systemName: "checkmark.circle.fill").font(.title2)
                                             .foregroundStyle(Theme.onPeach, Theme.peach)
+                                            .allowsHitTesting(false)
                                     }
                                 }
-                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                         }
                         .buttonStyle(.plain)
+                        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .id(id)
                         .disabled(disabled)
                     }
                 }
