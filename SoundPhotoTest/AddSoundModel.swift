@@ -48,6 +48,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     var confirmBeforeSave = true
     private var lastCheckedChangeCount = -1
     private var loadTask: Task<Void, Never>?
+    private var isSaving = false
 
     private var recorder: AVAudioRecorder?
     private var recordURL: URL?
@@ -785,11 +786,16 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     // MARK: 3. Save sound copy
 
     func saveSoundCopy() async -> SavedAsset? {
+        if let result {
+            say("Already saved this one — not writing another copy."); return result
+        }
+        guard !isSaving else { say("Save already in progress."); return result }
         guard let asset = photoAsset, let data = imageData, let audio = audioURL else {
             say("Choose a photo and a sound first."); return nil
         }
+        isSaving = true
         busy = true
-        defer { busy = false }
+        defer { isSaving = false; busy = false }
         stopPlayback()
         say("\n=== Save sound copy — \(Date()) ===")
         say("photo: \(asset.localIdentifier)  sound: \(audio.lastPathComponent) \(String(format: "%.2f", audioDuration)) s  movie max side: \(movieMaxSide)")
