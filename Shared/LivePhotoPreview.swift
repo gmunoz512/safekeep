@@ -5,8 +5,8 @@ import PhotosUI
 import SwiftUI
 
 /// Activates a playback session that is not silenced by the Ring/Silent switch.
-/// PHLivePhotoView will otherwise follow the default session (silenced when the switch is on),
-/// which matches "Playing…" with no sound.
+/// PHLivePhotoView still often stays silent when the switch is on (same as the Photos app),
+/// so in-app playback also plays the paired movie's audio with AVPlayer.
 enum LivePhotoAudio {
     static func activatePlaybackSession() {
         let session = AVAudioSession.sharedInstance()
@@ -34,6 +34,22 @@ enum LivePhotoAudio {
             current = c.superview
         }
     }
+
+    /// Writes the Live Photo's paired movie (the voice track lives here) to a temp file for AVPlayer.
+    static func exportPairedMovie(for asset: PHAsset) async -> URL? {
+        let resources = PHAssetResource.assetResources(for: asset)
+        guard let video = resources.first(where: { $0.type == .pairedVideo }) else { return nil }
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("safekeep-audio-\(UUID().uuidString).MOV")
+        let opts = PHAssetResourceRequestOptions()
+        opts.isNetworkAccessAllowed = true
+        do {
+            try await PHAssetResourceManager.default().writeData(for: video, toFile: url, options: opts)
+            return url
+        } catch {
+            return nil
+        }
+    }
 }
 
 /// PHLivePhotoView that keeps audio on and prepares the session as soon as it is on screen.
@@ -41,14 +57,28 @@ final class UnmutedLivePhotoView: PHLivePhotoView {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         guard window != nil else { return }
-        isMuted = false
         LivePhotoAudio.allowPressAndHold(in: self)
         LivePhotoAudio.activatePlaybackSession()
+        if !didHookGesture {
+            playbackGestureRecognizer.addTarget(self, action: #selector(prepareSession(_:)))
+            didHookGesture = true
+        }
+    }
+
+    private var didHookGesture = false
+
+    @objc private func prepareSession(_ gesture: UIGestureRecognizer) {
+        if gesture.state == .began {
+            LivePhotoAudio.activatePlaybackSession()
+        }
     }
 }
 
 struct LivePhotoViewRep: UIViewRepresentable {
     let livePhoto: PHLivePhoto
+    /// Paired movie file from the saved Photos asset. Played with AVPlayer so the voice
+    /// is heard even when the Ring/Silent switch is on (PHLivePhotoView often stays mute).
+    var audioURL: URL? = nil
     @Binding var lastPlayed: String
     @Binding var playing: Bool
 
@@ -57,7 +87,7 @@ struct LivePhotoViewRep: UIViewRepresentable {
     func makeUIView(context: Context) -> PHLivePhotoView {
         let v = UnmutedLivePhotoView()
         v.contentMode = .scaleAspectFit
-        v.isMuted = false
+        v.isMuted = (audioURL != nil)
         v.delegate = context.coordinator
         return v
     }
@@ -65,27 +95,48 @@ struct LivePhotoViewRep: UIViewRepresentable {
     func updateUIView(_ v: PHLivePhotoView, context: Context) {
         context.coordinator.parent = self
         if v.livePhoto !== livePhoto { v.livePhoto = livePhoto }
-        v.isMuted = false
+        // When we have our own player, mute the view so the voice isn't doubled if
+        // PHLivePhotoView also plays audio (silent switch off).
+        v.isMuted = (audioURL != nil)
     }
 
     final class Coordinator: NSObject, PHLivePhotoViewDelegate {
         var parent: LivePhotoViewRep
         private var start: Date?
+        private var audioPlayer: AVPlayer?
         init(_ p: LivePhotoViewRep) { parent = p }
 
         func livePhotoView(_ livePhotoView: PHLivePhotoView, willBeginPlaybackWith playbackStyle: PHLivePhotoViewPlaybackStyle) {
             LivePhotoAudio.activatePlaybackSession()
-            livePhotoView.isMuted = false
             start = Date()
             // Hint playback is a short bounce and is typically muted. Only full
-            // (press-and-hold) playback should show "Playing…".
+            // (press-and-hold) playback should show "Playing…" and play the voice.
             parent.playing = (playbackStyle == .full)
+            if playbackStyle == .full {
+                startPairedAudio()
+            }
         }
 
         func livePhotoView(_ livePhotoView: PHLivePhotoView, didEndPlaybackWith playbackStyle: PHLivePhotoViewPlaybackStyle) {
+            stopPairedAudio()
             let secs = start.map { Date().timeIntervalSince($0) } ?? 0
             parent.playing = false
             parent.lastPlayed = String(format: "%.1f s (%@)", secs, playbackStyle == .full ? "full" : "hint")
+        }
+
+        private func startPairedAudio() {
+            stopPairedAudio()
+            guard let url = parent.audioURL else { return }
+            let player = AVPlayer(url: url)
+            player.volume = 1
+            player.isMuted = false
+            player.play()
+            audioPlayer = player
+        }
+
+        private func stopPairedAudio() {
+            audioPlayer?.pause()
+            audioPlayer = nil
         }
     }
 }
@@ -96,6 +147,7 @@ struct LivePhotoResultCard: View {
     var log: (String) -> Void = { _ in }
     var onDone: () -> Void
     @State private var livePhoto: PHLivePhoto?
+    @State private var audioURL: URL?
     @State private var status = "Loading…"
     @State private var lastPlayed = "-"
     @State private var playing = false
@@ -111,7 +163,7 @@ struct LivePhotoResultCard: View {
             ZStack {
                 Color.black.opacity(0.15)
                 if let livePhoto {
-                    LivePhotoViewRep(livePhoto: livePhoto, lastPlayed: $lastPlayed, playing: $playing)
+                    LivePhotoViewRep(livePhoto: livePhoto, audioURL: audioURL, lastPlayed: $lastPlayed, playing: $playing)
                 } else {
                     Text(status).font(Theme.rounded(.footnote)).foregroundStyle(Theme.sage).padding()
                 }
@@ -133,7 +185,10 @@ struct LivePhotoResultCard: View {
             status = "Saved asset not found."; log("result: asset not found \(item.localIdentifier)"); return
         }
         isLive = asset.mediaSubtypes.contains(.photoLive)
-        log("result card: \(item.localIdentifier) isLive=\(isLive)")
+        let movie = await LivePhotoAudio.exportPairedMovie(for: asset)
+        audioURL = movie
+        let size = movie.flatMap { (try? FileManager.default.attributesOfItem(atPath: $0.path)[.size] as? NSNumber)?.intValue } ?? 0
+        log("result card: \(item.localIdentifier) isLive=\(isLive) pairedMovie=\(movie != nil ? "yes (\(ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)))" : "NO")")
         let o = PHLivePhotoRequestOptions()
         o.deliveryMode = .highQualityFormat
         o.isNetworkAccessAllowed = true

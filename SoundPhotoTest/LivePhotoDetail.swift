@@ -7,6 +7,7 @@ import SwiftUI
 struct LivePhotoDetail: View {
     let item: SavedAsset
     @State private var livePhoto: PHLivePhoto?
+    @State private var audioURL: URL?
     @State private var status = "Loading…"
     @State private var info = ""
     @State private var lastPlayed = "-"
@@ -20,7 +21,7 @@ struct LivePhotoDetail: View {
                 ZStack {
                     Color.black.opacity(0.05)
                     if let livePhoto {
-                        LivePhotoViewRep(livePhoto: livePhoto, lastPlayed: $lastPlayed, playing: $playing)
+                        LivePhotoViewRep(livePhoto: livePhoto, audioURL: audioURL, lastPlayed: $lastPlayed, playing: $playing)
                     } else {
                         Text(status).font(.footnote).padding()
                     }
@@ -59,6 +60,8 @@ struct LivePhotoDetail: View {
         info += "id: \(item.localIdentifier)\n"
         info += "created: \(asset.creationDate.map(df.string(from:)) ?? "nil")  hidden: \(asset.isHidden)\n"
         info += "iOS says Live: \(asset.mediaSubtypes.contains(.photoLive))  \(asset.pixelWidth)x\(asset.pixelHeight)\n"
+        audioURL = await LivePhotoAudio.exportPairedMovie(for: asset)
+        info += "paired movie for in-app audio: \(audioURL != nil ? "yes" : "NO")\n"
         let opts = PHLivePhotoRequestOptions()
         opts.deliveryMode = .highQualityFormat
         opts.isNetworkAccessAllowed = true

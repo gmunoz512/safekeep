@@ -198,7 +198,7 @@ struct QuickPasteView: View {
             }
             .buttonStyle(PeachButtonStyle())
             HStack(spacing: 6) {
-                Text("It's in the \"Safekeep\" album.")
+                Text("It's already in Recents and the \"Safekeep\" album. No need to save it again.")
                     .font(Theme.rounded(.caption)).foregroundStyle(Theme.sage)
                 Button("Open Photos app") { openPhotosApp() }
                     .font(Theme.rounded(.caption, .semibold)).foregroundStyle(Theme.peach)
@@ -234,6 +234,7 @@ struct SavedPhotoViewer: View {
     var log: (String) -> Void = { _ in }
     let onClose: () -> Void
     @State private var livePhoto: PHLivePhoto?
+    @State private var audioURL: URL?
     @State private var status = "Loading…"
     @State private var lastPlayed = "-"
     @State private var playing = false
@@ -245,7 +246,7 @@ struct SavedPhotoViewer: View {
         ZStack {
             Color.black.ignoresSafeArea()
             if let livePhoto {
-                LivePhotoViewRep(livePhoto: livePhoto, lastPlayed: $lastPlayed, playing: $playing)
+                LivePhotoViewRep(livePhoto: livePhoto, audioURL: audioURL, lastPlayed: $lastPlayed, playing: $playing)
                     .ignoresSafeArea()
             } else {
                 VStack(spacing: 12) {
@@ -288,6 +289,8 @@ struct SavedPhotoViewer: View {
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [item.localIdentifier], options: nil).firstObject else {
             status = "Saved photo not found."; log("viewer: asset not found"); return
         }
+        audioURL = await LivePhotoAudio.exportPairedMovie(for: asset)
+        log("viewer: pairedMovie=\(audioURL != nil ? "yes" : "NO")")
         let o = PHLivePhotoRequestOptions()
         o.deliveryMode = .highQualityFormat
         o.isNetworkAccessAllowed = true
@@ -304,6 +307,7 @@ struct SavedPhotoViewer: View {
     }
 
     /// Exports the photo + paired movie (same content identifier) so the share sheet can send it as a Live Photo.
+    /// Saving to the camera roll is excluded: that would create two extra items (still + video).
     private func prepareShare() async {
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [item.localIdentifier], options: nil).firstObject else { return }
         preparingShare = true
@@ -329,7 +333,11 @@ struct SavedPhotoViewer: View {
 struct ActivitySheet: UIViewControllerRepresentable {
     let items: [Any]
     func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+        let vc = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        // Already saved to Photos as one Live Photo. "Save 2 Items" would write the
+        // still and the movie as two separate camera-roll entries.
+        vc.excludedActivityTypes = [.saveToCameraRoll]
+        return vc
     }
     func updateUIViewController(_ vc: UIActivityViewController, context: Context) {}
 }
