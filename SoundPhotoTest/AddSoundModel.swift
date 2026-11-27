@@ -361,19 +361,25 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func saveWith(_ asset: PHAsset) async -> SavedAsset? {
         confirmAsset = nil
         selectedForSave = nil
+        if let result { say("Already saved this one — not writing another copy."); return result }
+        guard !isSaving else { say("Save already in progress."); return result }
+        isSaving = true
+        busy = true
+        defer { isSaving = false; busy = false }
         say("One-tap save for \(asset.localIdentifier)")
         await loadTask?.value
         loadTask = nil
         if photoAsset?.localIdentifier != asset.localIdentifier || imageData == nil {
-            await picked(asset.localIdentifier)
+            await picked(asset.localIdentifier, clearPreviousResult: false)
         }
         guard photoAsset?.localIdentifier == asset.localIdentifier, imageData != nil else {
             say("Photo data not available; not saved."); return nil
         }
-        return await saveSoundCopy()
+        return await commitSoundCopy()
     }
 
     private func soundArrived() {
+        if result != nil || isSaving { return }
         if let a = selectedForSave {
             say("Sound arrived with a photo already selected → saving now")
             Task { await self.saveWith(a) }
@@ -409,7 +415,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     // MARK: 1. Photo
 
-    func picked(_ assetID: String?) async {
+    func picked(_ assetID: String?, clearPreviousResult: Bool = true) async {
         say("\n=== Photo chosen — \(Date()) ===")
         say(Mem.line("before photo load"))
         guard let assetID else {
@@ -424,7 +430,9 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
         photoAsset = asset
         imageData = nil
-        result = nil
+        // Never drop the "already saved" guard while a write is in flight — that let a
+        // second PHAssetCreationRequest run and put extra items in the camera roll.
+        if clearPreviousResult, !isSaving { result = nil }
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd HH:mm:ss ZZZZZ"
         say("creationDate: \(asset.creationDate.map(df.string(from:)) ?? "nil")")
         say("location: \(asset.location.map { "\($0.coordinate.latitude),\($0.coordinate.longitude)" } ?? "nil")")
@@ -442,8 +450,9 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             DispatchQueue.main.async { if let img { self?.thumbnail = img } }
         }
 
+        let heldBusy = busy
         busy = true
-        defer { busy = false; downloadProgress = nil }
+        defer { downloadProgress = nil; if !heldBusy { busy = false } }
         let opts = PHImageRequestOptions()
         opts.version = .current
         opts.deliveryMode = .highQualityFormat
@@ -531,7 +540,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     private func applyPickedImageData(_ data: Data, source: String) {
         photoAsset = nil
-        result = nil
+        if !isSaving { result = nil }
         imageData = data
         thumbnail = UIImage(data: data)
         photoInfo = "\(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)) · \(source)"
@@ -887,13 +896,22 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             say("Already saved this one — not writing another copy."); return result
         }
         guard !isSaving else { say("Save already in progress."); return result }
+        guard imageData != nil, audioURL != nil else {
+            say("Choose a photo and a sound first."); return nil
+        }
+        isSaving = true
+        busy = true
+        defer { isSaving = false; busy = false }
+        return await commitSoundCopy()
+    }
+
+    /// Performs the actual PhotoKit write. Caller must already hold `isSaving`.
+    private func commitSoundCopy() async -> SavedAsset? {
+        if let result { say("Already saved this one — not writing another copy."); return result }
         guard let data = imageData, let audio = audioURL else {
             say("Choose a photo and a sound first."); return nil
         }
         let asset = photoAsset
-        isSaving = true
-        busy = true
-        defer { isSaving = false; busy = false }
         stopPlayback()
         say("\n=== Save sound copy — \(Date()) ===")
         say("photo: \(asset?.localIdentifier ?? "picked file")  sound: \(audio.lastPathComponent) \(String(format: "%.2f", audioDuration)) s  movie max side: \(movieMaxSide)")
@@ -970,13 +988,25 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             if !ns.userInfo.isEmpty { say("  userInfo: \(ns.userInfo)") }
             return nil
         }
-        guard let newID = holder.value,
-              let a = PHAsset.fetchAssets(withLocalIdentifiers: [newID], options: nil).firstObject else {
-            say("Saved but could not read back."); return nil
+        // The write already landed in Photos. Record the placeholder ID even if
+        // the asset isn't readable yet (limited access / timing). Returning nil
+        // here used to let a second save create another camera-roll item.
+        guard let newID = holder.value else {
+            say("SAVE reported success but no placeholder ID."); return nil
+        }
+        let savedAsset = SavedAsset(code: code, title: title, localIdentifier: newID, savedAt: Date())
+        result = savedAsset
+        guard let a = PHAsset.fetchAssets(withLocalIdentifiers: [newID], options: nil).firstObject else {
+            say("Saved (\(newID)) but could not read back yet — not writing another copy.")
+            return savedAsset
         }
         let df = DateFormatter(); df.dateFormat = "yyyy-MM-dd HH:mm:ss ZZZZZ"
         say("new localIdentifier: \(newID)")
-        say("isLive: \(a.mediaSubtypes.contains(.photoLive) ? "YES" : "NO")  size: \(a.pixelWidth)x\(a.pixelHeight)")
+        let isLive = a.mediaSubtypes.contains(.photoLive)
+        say("isLive: \(isLive ? "YES" : "NO")  size: \(a.pixelWidth)x\(a.pixelHeight)")
+        if !isLive {
+            say("WARNING: Photos did not treat this as a Live Photo. Identifiers matched at write time; check the camera roll before saving again.")
+        }
         say("creationDate: \(a.creationDate.map(df.string(from:)) ?? "nil")  location: \(a.location.map { "\($0.coordinate.latitude),\($0.coordinate.longitude)" } ?? "nil")")
         say(Mem.line("after save"))
         let res = PHAssetResource.assetResources(for: a)
@@ -986,7 +1016,7 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             let o = PHFetchOptions(); o.predicate = NSPredicate(format: "localIdentifier == %@", newID)
             say("album add: \(albumAdd.value ?? "not attempted") → in album: \(PHAsset.fetchAssets(in: album, options: o).count > 0 ? "YES" : "NO")")
         }
-        return SavedAsset(code: code, title: title, localIdentifier: newID, savedAt: Date())
+        return savedAsset
     }
 
     static func ensureAlbum(_ name: String) async throws -> PHAssetCollection? {
