@@ -2,10 +2,11 @@ import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// PHPicker bound to the shared library so results carry an assetIdentifier.
+/// PHPicker bound to the shared library so results carry an assetIdentifier when possible.
+/// The system picker itself does not require full Photo Library access.
 struct PhotoPicker: UIViewControllerRepresentable {
     @Binding var isPresented: Bool
-    let onPick: (String?) -> Void
+    let onPick: (PHPickerResult) -> Void
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -26,7 +27,25 @@ struct PhotoPicker: UIViewControllerRepresentable {
         init(_ p: PhotoPicker) { parent = p }
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
             parent.isPresented = false
-            if let first = results.first { parent.onPick(first.assetIdentifier) }
+            if let first = results.first { parent.onPick(first) }
+        }
+    }
+}
+
+/// Button + sheet used on the add screens and in the share/Messages extensions.
+struct ChooseFromPhotosButton: View {
+    var disabled = false
+    let onResult: (PHPickerResult) -> Void
+    @State private var showPicker = false
+
+    var body: some View {
+        Button { showPicker = true } label: {
+            Label("Choose from Photos", systemImage: "photo.on.rectangle")
+        }
+        .buttonStyle(SoftButtonStyle())
+        .disabled(disabled)
+        .sheet(isPresented: $showPicker) {
+            PhotoPicker(isPresented: $showPicker, onPick: onResult)
         }
     }
 }

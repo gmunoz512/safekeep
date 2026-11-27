@@ -19,6 +19,7 @@ struct QuickPasteView: View {
     @State private var viewing: SavedAsset?
     @State private var showLog = false
     @State private var presenter = PresenterHolder()
+    @State private var showPhotoPicker = false
 
     var body: some View {
         ZStack {
@@ -32,6 +33,7 @@ struct QuickPasteView: View {
                         header
                         statusCard
                         if let sel = m.selectedForSave, m.audioURL == nil { queuedRow(sel) }
+                        else if m.imageData != nil, m.audioURL == nil, m.selectedForSave == nil { pickedFileRow }
                         photos
                     }
                     if showLog { LogPanel(m: m) }
@@ -48,6 +50,10 @@ struct QuickPasteView: View {
         .onAppear {
             m.logPrefix = "[app-paste] "
             m.confirmBeforeSave = false
+            if router.pendingPickPhoto {
+                router.pendingPickPhoto = false
+                showPhotoPicker = true
+            }
             let model = m
             recents.log = { [weak model] s in model?.say(s) }
             m.say("=== Quick paste screen (opened from Messages) — build \(Bundle.main.infoDictionary?["CFBundleVersion"] ?? "?") — \(Date()) ===")
@@ -178,13 +184,40 @@ struct QuickPasteView: View {
         .themeCard(padding: 12)
     }
 
+    private var pickedFileRow: some View {
+        HStack(spacing: 12) {
+            if let t = m.thumbnail {
+                Image(uiImage: t).resizable().scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            Text("Photo selected — paste the voice note to save")
+                .font(Theme.rounded(.subheadline)).foregroundStyle(Theme.cream)
+            Spacer()
+            Button("Cancel") { m.clearPhoto() }.font(Theme.rounded(.footnote)).foregroundStyle(Theme.peach)
+        }
+        .themeCard(padding: 12)
+    }
+
     private var photos: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Recent photos").font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.cream)
+            HStack(alignment: .firstTextBaseline) {
+                Text("Recent photos").font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.cream)
+                Spacer()
+                ChooseFromPhotosButton(disabled: m.busy) { result in
+                    Task { await m.adoptPickerResult(result) }
+                }
+            }
             RecentPhotosGrid(recents: recents, selectedID: m.selectedForSave?.localIdentifier,
                              disabled: m.busy, columns: 3, presenter: presenter) { asset in
                 // tapPhoto: sound ready → save now; otherwise the photo is queued (never saved without sound).
                 m.tapPhoto(asset, source: "quick paste grid")
+            }
+        }
+        .sheet(isPresented: $showPhotoPicker) {
+            PhotoPicker(isPresented: $showPhotoPicker) { result in
+                Task { await m.adoptPickerResult(result) }
             }
         }
     }
@@ -192,7 +225,7 @@ struct QuickPasteView: View {
     private func savedCard(_ r: SavedAsset) -> some View {
         VStack(alignment: .leading, spacing: 16) {
             savedTitle
-            LivePhotoResultCard(item: r, log: { m.say($0) }) { m.result = nil; m.clearSound() }
+            LivePhotoResultCard(item: r, log: { m.say($0) }) { m.result = nil; m.clearSound(); m.clearPhoto() }
             Button { viewing = r } label: {
                 Label("View photo", systemImage: "photo")
             }
@@ -207,7 +240,7 @@ struct QuickPasteView: View {
                 Text("iOS wouldn't open Photos from here. Open the Photos app → Albums → \"Safekeep\".")
                     .font(Theme.rounded(.caption)).foregroundStyle(Theme.peach)
             }
-            Button("Add another") { m.result = nil; m.clearSound() }.buttonStyle(SoftButtonStyle())
+            Button("Add another") { m.result = nil; m.clearSound(); m.clearPhoto() }.buttonStyle(SoftButtonStyle())
         }
     }
 

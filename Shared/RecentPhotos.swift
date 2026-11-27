@@ -229,8 +229,14 @@ struct RecentPhotosGrid: View {
         VStack(alignment: .leading, spacing: 8) {
             switch recents.status {
             case .denied, .restricted:
-                Text("No Photos access. Open Settings > Privacy & Security > Photos > Safekeep and choose Full Access (or open Safekeep once).")
-                    .font(Theme.rounded(.footnote)).foregroundStyle(Theme.sage)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Photos access is off. You can still use Choose from Photos to pick one picture. To list recent photos, turn access on in Settings.")
+                        .font(Theme.rounded(.footnote)).foregroundStyle(Theme.sage)
+                    Button("Open Settings") {
+                        if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }
+                    }
+                    .font(Theme.rounded(.caption, .semibold)).foregroundStyle(Theme.peach)
+                }
             case .notDetermined:
                 Text("Open Safekeep once to allow Photos access.").font(Theme.rounded(.footnote)).foregroundStyle(Theme.sage)
             default:

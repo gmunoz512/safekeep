@@ -2,6 +2,7 @@ import AVFoundation
 import CoreLocation
 import ImageIO
 import Photos
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -104,6 +105,13 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     nonisolated static func isAudioType(_ id: String) -> Bool {
         if knownAudioTypes.contains(id) { return true }
         return UTType(id)?.conforms(to: .audio) ?? false
+    }
+
+    nonisolated static func isImageType(_ id: String) -> Bool {
+        if UTType(id)?.conforms(to: .image) == true { return true }
+        let s = id.lowercased()
+        return s.contains("jpeg") || s.contains("jpg") || s.contains("heic") || s.contains("heif")
+            || s.contains("png") || s.hasSuffix(".image") || s.contains("live-photo")
     }
 
     // MARK: 0. Clipboard detection (no paste prompt: only types / changeCount / has* are read)
@@ -366,9 +374,15 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     private func soundArrived() {
-        guard let a = selectedForSave else { return }
-        say("Sound arrived with a photo already selected → saving now")
-        Task { await self.saveWith(a) }
+        if let a = selectedForSave {
+            say("Sound arrived with a photo already selected → saving now")
+            Task { await self.saveWith(a) }
+            return
+        }
+        if imageData != nil {
+            say("Sound arrived with a picked photo already loaded → saving now")
+            Task { await self.saveSoundCopy() }
+        }
     }
 
     func clearSound() {
@@ -378,6 +392,20 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         audioInfo = ""
         say("Sound cleared.")
     }
+
+    func clearPhoto() {
+        photoAsset = nil
+        imageData = nil
+        thumbnail = nil
+        photoInfo = ""
+        selectedForSave = nil
+        confirmAsset = nil
+        downloadProgress = nil
+        say("Photo cleared.")
+    }
+
+    /// True when a photo is queued or its full image data is already loaded.
+    var hasPickedPhoto: Bool { photoAsset != nil || imageData != nil || selectedForSave != nil }
 
     // MARK: 1. Photo
 
@@ -444,6 +472,75 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             let maker = p[kCGImagePropertyMakerAppleDictionary as String] as? [String: Any]
             say(Mem.line("after photo load"))
             say("image source: type=\(CGImageSourceGetType(src) as String? ?? "?") \(p[kCGImagePropertyPixelWidth as String] ?? "?")x\(p[kCGImagePropertyPixelHeight as String] ?? "?") DateTimeOriginal=\(exif?[kCGImagePropertyExifDateTimeOriginal as String] ?? "none") GPS=\(p[kCGImagePropertyGPSDictionary as String] != nil) MakerApple17=\(maker?["17"] ?? "none")")
+        }
+    }
+
+
+    /// Handles a photo from PHPicker: prefer the library asset (keeps date/location),
+    /// otherwise load the image bytes from the picker (no full-library permission needed).
+    func adoptPickerResult(_ result: PHPickerResult) async {
+        say("\n=== Choose from Photos — \(Date()) ===")
+        if let id = result.assetIdentifier {
+            var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+            if status == .notDetermined {
+                status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            }
+            say("Photos access: \(status == .authorized ? "authorized" : status == .limited ? "limited" : "not granted (\(status.rawValue))")")
+            if let asset = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject {
+                tapPhoto(asset, source: "PHPicker")
+                return
+            }
+            say("Could not fetch PHAsset for \(id) — loading the image from the picker instead.")
+        }
+        if await loadImageFromProviders([result.itemProvider], method: "PHPicker") { return }
+        say("Choose from Photos: couldn't read that image.")
+        setPasteStatus("Couldn't read the photo you picked. Try another one, or allow Photos access in Settings.", error: true)
+    }
+
+    /// Loads a still image from share-sheet or picker item providers. Returns true if imageData was set.
+    @discardableResult
+    func loadImageFromProviders(_ providers: [NSItemProvider], method: String) async -> Bool {
+        let preferred = ["public.heic", "public.heif", "public.jpeg", "public.png", "public.image"]
+        for (i, p) in providers.enumerated() {
+            let reg = p.registeredTypeIdentifiers
+            say("  image provider\(i) types: \(reg)")
+            var candidates: [String] = reg.filter(Self.isImageType)
+            for t in preferred where !candidates.contains(t) && p.hasItemConformingToTypeIdentifier(t) {
+                candidates.append(t)
+            }
+            for t in candidates {
+                setPasteStatus("Loading photo (\(t))…")
+                if let data = await Self.loadImageData(p, type: t), !data.isEmpty {
+                    applyPickedImageData(data, source: "\(method) (\(t))")
+                    return true
+                }
+                say("  \(t) data: empty or failed")
+            }
+        }
+        return false
+    }
+
+    private static func loadImageData(_ p: NSItemProvider, type: String) async -> Data? {
+        await withCheckedContinuation { (c: CheckedContinuation<Data?, Never>) in
+            p.loadDataRepresentation(forTypeIdentifier: type) { data, err in
+                if let err { print("loadImageData \(type): \(err.localizedDescription)") }
+                c.resume(returning: data)
+            }
+        }
+    }
+
+    private func applyPickedImageData(_ data: Data, source: String) {
+        photoAsset = nil
+        result = nil
+        imageData = data
+        thumbnail = UIImage(data: data)
+        photoInfo = "\(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file)) · \(source)"
+        say("photo data from \(source): \(photoInfo)")
+        setPasteStatus(audioURL == nil
+                       ? "Photo ready — paste the voice note to save"
+                       : "Photo ready: \(String(format: "%.1f", audioDuration)) s voice note will be added")
+        if audioURL != nil, !confirmBeforeSave, !isSaving, result == nil {
+            Task { await saveSoundCopy() }
         }
     }
 
@@ -790,24 +887,25 @@ final class AddSoundModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             say("Already saved this one — not writing another copy."); return result
         }
         guard !isSaving else { say("Save already in progress."); return result }
-        guard let asset = photoAsset, let data = imageData, let audio = audioURL else {
+        guard let data = imageData, let audio = audioURL else {
             say("Choose a photo and a sound first."); return nil
         }
+        let asset = photoAsset
         isSaving = true
         busy = true
         defer { isSaving = false; busy = false }
         stopPlayback()
         say("\n=== Save sound copy — \(Date()) ===")
-        say("photo: \(asset.localIdentifier)  sound: \(audio.lastPathComponent) \(String(format: "%.2f", audioDuration)) s  movie max side: \(movieMaxSide)")
+        say("photo: \(asset?.localIdentifier ?? "picked file")  sound: \(audio.lastPathComponent) \(String(format: "%.2f", audioDuration)) s  movie max side: \(movieMaxSide)")
         say(Mem.line("before build"))
-        let baseDate = asset.creationDate ?? Date()
+        let baseDate = asset?.creationDate ?? Date()
         let newDate = baseDate.addingTimeInterval(1)
-        let loc = asset.location
+        let loc = asset?.location
         let saved = await buildAndSave(imageData: data, audioURL: audio, creationDate: newDate, location: loc,
                                        albumName: Self.albumName, code: "S", title: "Sound copy",
                                        filenameBase: "SoundPhoto_\(Int(Date().timeIntervalSince1970))")
         if let saved { result = saved }
-        say("Original untouched: \(asset.localIdentifier)")
+        if let asset { say("Original untouched: \(asset.localIdentifier)") }
         return saved
     }
 

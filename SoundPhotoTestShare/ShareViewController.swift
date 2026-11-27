@@ -2,7 +2,7 @@ import Photos
 import SwiftUI
 import UIKit
 
-/// Share sheet "Safekeep": audio file in → recent photos grid → tap photo = saved.
+/// Share sheet "Safekeep": a photo or a voice note in, then the missing half, then one save.
 final class ShareViewController: UIViewController {
     private let model = AddSoundModel()
     private let recents = RecentPhotosModel()
@@ -36,13 +36,13 @@ final class ShareViewController: UIViewController {
         h.didMove(toParent: self)
 
         Task { @MainActor in
-            await loadSharedAudio()
+            await loadSharedItems()
             if recents.status == .notDetermined { await recents.requestAccess() }
             await recents.load(reason: "share sheet")
         }
     }
 
-    private func loadSharedAudio() async {
+    private func loadSharedItems() async {
         let items = extensionContext?.inputItems.compactMap { $0 as? NSExtensionItem } ?? []
         var providers: [NSItemProvider] = []
         for (i, item) in items.enumerated() {
@@ -54,10 +54,11 @@ final class ShareViewController: UIViewController {
         guard !providers.isEmpty else {
             model.setPasteStatus("The share sheet didn't hand over any file.", error: true); return
         }
-        model.setPasteStatus("Loading the shared audio…")
+        model.setPasteStatus("Loading the shared item…")
         if await model.loadFromProviders(providers, method: "share sheet") { return }
+        if await model.loadImageFromProviders(providers, method: "share sheet") { return }
         let types = providers.flatMap(\.registeredTypeIdentifiers)
-        model.setPasteStatus("Shared item has no usable audio (\(types.joined(separator: ", "))) — see log", error: true)
+        model.setPasteStatus("Shared item isn't a photo or a voice note (\(types.joined(separator: ", "))) — see log", error: true)
     }
 
     private func finish() {
@@ -94,7 +95,7 @@ struct ShareRootView: View {
                         if let r = m.result {
                             LivePhotoResultCard(item: r, log: { m.say($0) }) { done() }
                         } else {
-                            QuickFlowView(m: m, recents: recents, columns: 3, showPasteControls: false)
+                            QuickFlowView(m: m, recents: recents, columns: 3, showPasteControls: m.audioURL == nil)
                         }
                         if showLog { LogPanel(m: m) }
                     }
