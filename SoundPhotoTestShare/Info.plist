@@ -17,7 +17,13 @@
     SUBQUERY (
         $extensionItem.attachments,
         $attachment,
-        ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audio"
+        ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.image"
+        || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.jpeg"
+        || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.png"
+        || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.heic"
+        || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.heif"
+        || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.live-photo"
+        || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audio"
         || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.coreaudio-format"
         || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.m4a-audio"
         || ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.messages.audioMessage"

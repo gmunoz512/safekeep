@@ -82,11 +82,8 @@ struct AddSoundView: View {
             .buttonStyle(.bordered)
             .disabled(m.busy)
             .sheet(isPresented: $showPhotoPicker) {
-                PhotoPicker(isPresented: $showPhotoPicker) { id in
-                    guard let id, let a = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil).firstObject else {
-                        Task { await m.picked(id) }; return
-                    }
-                    m.tapPhoto(a, source: "PHPicker")
+                PhotoPicker(isPresented: $showPhotoPicker) { result in
+                    Task { await m.adoptPickerResult(result) }
                 }
             }
         }

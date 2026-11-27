@@ -21,6 +21,7 @@ struct QuickFlowView: View {
             if m.busy { busyRow }
             if m.audioURL != nil { soundReadyRow }
             if let sel = m.selectedForSave, m.audioURL == nil { pendingRow(sel) }
+            else if m.imageData != nil, m.audioURL == nil, m.selectedForSave == nil { pickedFileRow }
             recentSection
         }
     }
@@ -165,12 +166,30 @@ struct QuickFlowView: View {
         .themeCard(padding: 12)
     }
 
+    private var pickedFileRow: some View {
+        HStack(spacing: 12) {
+            if let img = m.thumbnail {
+                Image(uiImage: img).resizable().scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            }
+            Text("Photo selected — paste the voice note to save").font(Theme.rounded(.subheadline)).foregroundStyle(Theme.cream)
+            Spacer()
+            Button("Cancel") { m.clearPhoto() }.font(Theme.rounded(.footnote)).foregroundStyle(Theme.peach)
+        }
+        .themeCard(padding: 12)
+    }
+
     private var recentSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Recent photos").font(Theme.rounded(.headline, .semibold)).foregroundStyle(Theme.cream)
                 Spacer()
-                Text("newest added first").font(Theme.rounded(.caption2)).foregroundStyle(Theme.sage)
+                ChooseFromPhotosButton(disabled: m.busy) { result in
+                    onNeedRoom()
+                    Task { await m.adoptPickerResult(result) }
+                }
             }
             RecentPhotosGrid(recents: recents, selectedID: m.selectedForSave?.localIdentifier ?? m.confirmAsset?.localIdentifier,
                              disabled: m.busy, columns: columns, presenter: presenter) { asset in

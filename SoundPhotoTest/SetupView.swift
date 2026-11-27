@@ -25,6 +25,11 @@ struct SetupView: View {
                                     : "A voice note is on your clipboard. Tap to add it to a photo.") {
                             router.openQuickPaste(reason: "hero card (clipboard audio: \(clipAudioTypes.isEmpty ? "none" : clipAudioTypes.joined(separator: ", ")))")
                         }
+                        HeroCard(title: "Choose from Photos",
+                                 subtitle: "Pick a picture from your camera roll, then add a voice note.",
+                                 icon: "photo.on.rectangle") {
+                            router.openQuickPaste(reason: "hero card (choose from photos)", pickPhoto: true)
+                        }
                         header
                         permissionCard
                         howToCarousel
@@ -205,12 +210,12 @@ struct SetupView: View {
                     Task { status = await PHPhotoLibrary.requestAuthorization(for: .readWrite) }
                 }
                 .buttonStyle(PeachButtonStyle())
-                Text("Choose \"Allow Full Access\" so your most recently saved photos show up.")
+                Text("Choose \"Allow Full Access\" so recently saved photos appear in the list. You can still pick any picture with Choose from Photos.")
                     .font(.system(.caption)).foregroundStyle(Theme.secondaryText)
             default:
                 Text(status == .limited
-                     ? "Only some photos are shared. For newly saved photos to show up, choose Full Access."
-                     : "Photos access is off. Turn it on to save sound photos.")
+                     ? "Only some photos are listed. Use Choose from Photos to pick any picture, or open Settings for Full Access."
+                     : "Photos access is off. You can still pick a picture with Choose from Photos. To list recent photos and save, turn access on in Settings.")
                     .font(.system(.subheadline)).foregroundStyle(Theme.primaryText.opacity(0.9))
                 Button("Open Settings → Photos → Full Access") {
                     if let u = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(u) }

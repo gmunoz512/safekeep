@@ -19,8 +19,11 @@ final class AppRouter: ObservableObject {
 
     /// Audio file picked on the main screen; the quick paste screen loads it instead of pasting.
     @Published var pendingFile: URL?
+    /// When true, the quick paste screen opens the Photos picker as soon as it appears.
+    @Published var pendingPickPhoto = false
 
-    func openQuickPaste(reason: String) {
+    func openQuickPaste(reason: String, pickPhoto: Bool = false) {
+        pendingPickPhoto = pickPhoto
         print("[router] quick paste opened: \(reason)")
         showQuickPaste = true
     }

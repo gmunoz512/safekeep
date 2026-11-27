@@ -489,7 +489,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Safekeep uses Photos so you can choose a picture from your camera roll and save a copy with your voice note.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -519,7 +519,7 @@
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Safekeep uses Photos so you can choose a picture from your camera roll and save a copy with your voice note.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
@@ -551,7 +551,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Safekeep uses Photos so you can choose a picture from your camera roll and save a copy with your voice note.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -580,7 +580,7 @@
 				INFOPLIST_FILE = SoundPhotoTestMessages/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Safekeep uses Photos so you can choose a picture from your camera roll and save a copy with your voice note.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -609,7 +609,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Records a voice clip to attach to a photo.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Safekeep uses Photos so you can choose a picture from your camera roll and save a copy with your voice note.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -637,7 +637,7 @@
 				INFOPLIST_FILE = SoundPhotoTestShare/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Safekeep;
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Saves the photo copy with the voice note to your library.";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Shows your recently saved photos so you can add a voice note to one.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Safekeep uses Photos so you can choose a picture from your camera roll and save a copy with your voice note.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
