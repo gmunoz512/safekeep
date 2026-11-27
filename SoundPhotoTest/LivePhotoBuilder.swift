@@ -241,7 +241,7 @@ enum LivePhotoBuilder {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("soundphoto-\(identifier)", isDirectory: true)
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let stillURL = dir.appendingPathComponent(heic ? "SoundPhoto.HEIC" : "SoundPhoto.JPG")
+        var stillURL = dir.appendingPathComponent(heic ? "SoundPhoto.HEIC" : "SoundPhoto.JPG")
         let movieURL = dir.appendingPathComponent("SoundPhoto.MOV")
 
         var props = (CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [String: Any]) ?? [:]
@@ -274,7 +274,19 @@ enum LivePhotoBuilder {
             props[kCGImagePropertyMakerAppleDictionary as String] = ["17": identifier]
             guard writeOut(props) else { throw TestError("Could not write still image (retry).") }
         }
-        notes.append("written still MakerApple[17] \(written17() == identifier ? "OK (match)" : "MISSING/MISMATCH")")
+        if written17() != identifier {
+            // HEIC sometimes drops MakerApple 17. A JPEG still pairs reliably with the movie.
+            notes.append("HEIC would not keep MakerApple[17]; writing JPEG instead")
+            stillURL = dir.appendingPathComponent("SoundPhoto.JPG")
+            let jpegOut = CGImageDestinationCreateWithURL(stillURL as CFURL, UTType.jpeg.identifier as CFString, 1, nil)
+            guard let jpegOut else { throw TestError("Could not create JPEG destination.") }
+            CGImageDestinationAddImageFromSource(jpegOut, src, 0, props as CFDictionary)
+            guard CGImageDestinationFinalize(jpegOut) else { throw TestError("Could not write JPEG still.") }
+        }
+        guard written17() == identifier else {
+            throw TestError("Still image is missing the Live Photo identifier — not saving, to avoid a loose still and video in the camera roll.")
+        }
+        notes.append("written still MakerApple[17] OK (match)")
         if let s3 = CGImageSourceCreateWithURL(stillURL as CFURL, nil),
            let p3 = CGImageSourceCopyPropertiesAtIndex(s3, 0, nil) as? [String: Any] {
             let e3 = p3[kCGImagePropertyExifDictionary as String] as? [String: Any]
@@ -328,6 +340,18 @@ enum LivePhotoBuilder {
         let a = try await asset.loadTracks(withMediaType: .audio).count
         let m = try await asset.loadTracks(withMediaType: .metadata).count
         out.append("movie tracks: video=\(v) audio=\(a) metadata=\(m)")
+        let stillOK: Bool
+        if let src = CGImageSourceCreateWithURL(pair.stillURL as CFURL, nil),
+           let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [String: Any],
+           let apple = props[kCGImagePropertyMakerAppleDictionary as String] as? [String: Any],
+           let stillID = apple["17"] as? String {
+            stillOK = stillID == pair.identifier
+        } else {
+            stillOK = false
+        }
+        guard stillOK, movieID == pair.identifier, a > 0 else {
+            throw TestError("Live Photo pairing is not valid (\(out.joined(separator: "; "))). Not saving, to avoid a loose still and video in the camera roll.")
+        }
         return out
     }
 }
